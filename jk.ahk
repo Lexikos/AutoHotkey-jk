@@ -4,12 +4,17 @@
 functions_use_lowercase_initial_letter := true
 
 ; Required libraries
-#Include ..\ActiveScript\JsRT.ahk
+#include ..\ActiveScript\JsRT.ahk
 #include <D>
 
 #SingleInstance Off
 OnError ErrorMsg
 RemoveAhkMenus
+
+; Avoid briefly showing the icon when A_IconHidden=true is present.
+; FIXME: prevent the timer from overriding JS use of A_IconHidden.
+; #NoTrayIcon
+; SetTimer () => A_IconHidden := false, -50
 
 ; Process command line
 jkfile := ""
@@ -22,15 +27,12 @@ if jkfile = "" {
 WinSetTitle jkfile ' - AutoHotkey v' JKVersion, A_ScriptHwnd
 ; TODO: #SingleInstance replacement? /restart replacement?
 
-; Utility values
+; Helpers
 undefined := ComObject(0,0)
+Object.Prototype.toString := this => Format("[{1} object]", type(this))
 
 ; Initialize script engine
-sc := (JsRT.Edge)()
-
-; Can't properly handle JsDisposeRuntime being called by sc.__Delete while we
-; still have references to ComObjects that came from sc, so never delete sc.
-ObjAddRef ObjPtr(sc)
+js := JsRT.Edge()
 
 AddAhkObjects(scope) {
     
@@ -92,54 +94,49 @@ AddAhkObjects(scope) {
     ;  - ... more?
 }
 
-AddAhkObjects sc._dsp
+AddAhkObjects js
 
-
+/*
 nativeGetCb := CallbackCreate(getCb, "F")
-DllCall(sc._dll "\JsCreateFunction", "ptr", nativeGetCb, "ptr", 0, "ptr*", &rfn:=0)
-sc.test := sc._JsToVt(rfn)
-
-
-
+rfn := JsRT.CreateFunction(nativeGetCb, 0)
+js.test := JsRT.FromJs(rfn)
 getCb(callee, isCtor, argv, argc, state) {
     loop (args := []).length := argc
-        args[A_Index] := sc._JsToVt(NumGet(argv + (A_Index-1)*A_PtrSize, "ptr"))
-    DllCall(sc._dll "\JsConvertValueToString", "ptr", NumGet(argv,"ptr"), "ptr*", &rs:=0)
-    D "getCb " sc.Function('$', 'return $ instanceof test')(args[1])
-    return sc._ToJs(MsgBox)
+        args[A_Index] := JsRT.FromJs(NumGet(argv + (A_Index-1)*A_PtrSize, "ptr"))
+    D "getCb " js.Function('$', 'return $ instanceof test')(args[1])
+    return JsRT.ToJs(MsgBox)
     ; if DllCall(sc._dll "\JsCallFunction", "ptr", rcb, "ptr", argv, "ushort", argc, "ptr*", &result:=0) {
         ; DllCall(sc._dll "\JsGetAndClearException", "ptr*", &excp:=0)
-        ; throw sc._JsToVt(excp)
+        ; throw JsRT.FromJs(excp)
     ; }
 }
+*/
 
-sc.ExecFile jkfile
+JsRT.RunFile jkfile
 
 
 BifCallWrapCallback(ahkfn, pn, p*) {
     static f_prop := "_f_"
     callCb(callee, isCtor, argv, argc, state) {
         ; This serves as the entry point into JS for a new AutoHotkey thread.
-        DllCall(sc._dll "\JsGetPropertyIdFromName", "str", f_prop, "ptr*", &idf:=0)
-        DllCall(sc._dll "\JsGetProperty", "ptr", callee, "ptr", idf, "ptr*", &rcb:=0)
-        if DllCall(sc._dll "\JsCallFunction", "ptr", rcb, "ptr", argv, "ushort", argc, "ptr*", &result:=0) {
-            DllCall(sc._dll "\JsGetAndClearException", "ptr*", &excp:=0)
-            throw sc._JsToVt(excp)
-        }
+        idf := JsRT.JsGetPropertyIdFromName(f_prop)
+        rcb := JsRT.JsGetProperty(callee, idf)
+        return JsRT.JsCallFunction(rcb, argv, argc)
     }
     if p.Has(pn) {
         cb := p[pn]
-        rcb := sc._ToJs(cb)
-        if JsGetValueType(rcb) = 6 { ; JsFunction
-            DllCall(sc._dll "\JsGetPropertyIdFromName", "str", f_prop, "ptr*", &idf:=0)
-            DllCall(sc._dll "\JsGetProperty", "ptr", rcb, "ptr", idf, "ptr*", &rfn:=0)
-            if JsGetValueType(rfn) = 0 { ; JsUndefined
-                static nativeCallCb := CallbackCreate(callCb, "F")
-                DllCall(sc._dll "\JsCreateFunction", "ptr", nativeCallCb, "ptr", 0, "ptr*", &rfn:=0)
-                DllCall(sc._dll "\JsSetProperty", "ptr", rfn, "ptr", idf, "ptr", rcb, "char", false)
-                DllCall(sc._dll "\JsSetProperty", "ptr", rcb, "ptr", idf, "ptr", rfn, "char", false)
-            }
-            p[pn] := ComObjectFor(rfn)
+        rcb := JsRT.ToJs(cb)
+        if JsRT.JsGetValueType(rcb) = 6 { ; JsFunction
+            ; idf := JsRT.JsGetPropertyIdFromName(f_prop)
+            ; rfn := JsRT.JsGetProperty(callee, idf)
+            ; if JsRT.JsGetValueType(rfn) = 0 { ; JsUndefined
+                ; static nativeCallCb := CallbackCreate(callCb, "F")
+                ; rfn := JsRT.JsCreateFunction(nativeCallCb, 0)
+                ; JsRT.JsSetProperty(rfn, idf, rcb, false)
+                ; JsRT.JsSetProperty(rcb, idf, rfn, false)
+            ; }
+            ; p[pn] := ComObjectFor(rfn)
+            p[pn] := ComObjectFor(rcb)
         }
     }
     return ahkfn(p*)
@@ -148,15 +145,15 @@ BifCallWrapCallback(ahkfn, pn, p*) {
 
 ComObjectFor(rv) {
     static x_prop := "_x_"
-    DllCall(sc._dll "\JsGetPropertyIdFromName", "str", x_prop, "ptr*", &idx:=0)
-    DllCall(sc._dll "\JsGetProperty", "ptr", rv, "ptr", idx, "ptr*", &rx:=0)
-    if JsGetValueType(rx) = 0 { ; JsUndefined
-        obj := sc._JsToVt(rv)
+    idx := JsRT.JsGetPropertyIdFromName(x_prop)
+    rx := JsRT.JsGetProperty(rv, idx)
+    if JsRT.JsGetValueType(rx) = 0 { ; JsUndefined
+        obj := JsRT.FromJs(rv)
         static finalizer := CallbackCreate(ObjRelease, "F", 1)
-        DllCall(sc._dll "\JsCreateExternalObject", "ptr", ObjPtrAddRef(obj), "ptr", finalizer, "ptr*", &rx:=0)
-        DllCall(sc._dll "\JsSetProperty", "ptr", rv, "ptr", idx, "ptr", rx, "char", true)
+        rx := JsRT.JsCreateExternalObject(ObjPtrAddRef(obj), finalizer)
+        JsRT.JsSetProperty(rv, idx, rx, true)
     } else {
-        DllCall(sc._dll "\JsGetExternalData", "ptr", rx, "ptr*", &pobj:=0)
+        pobj := JsRT.JsGetExternalData(rx)
         obj := ObjFromPtrAddRef(pobj)
     }
     return obj
@@ -170,8 +167,7 @@ BifCallReturnOutputVars(ahkfn, op, opr, p*) {
     for i in op
         p.InsertAt i, MakeRef()  ; Insert VarRefs into OutputVar positions.
     r := ahkfn(p*)               ; Call original function.
-    DllCall(sc._dll "\JsCreateObject", "ptr*", &ro:=0)
-    o := sc._JsToVt(ro)
+    o := js.Object()
     for i, name in op
         o.%name% := %p[i]%       ; Put output values into JS object.
     return opr ? opr(r, o) : o   ; Return JS object, allowing variations to be handled by opr.
@@ -179,7 +175,7 @@ BifCallReturnOutputVars(ahkfn, op, opr, p*) {
 
 
 JsEnum(v) {
-    static getIt := sc.Eval('(function(v) { return v[Symbol.iterator](); })')
+    static getIt := js.Eval('(function(v) { return v[Symbol.iterator](); })')
     try
         it := getIt(v)
     catch
@@ -188,16 +184,9 @@ JsEnum(v) {
 }
 
 
-JsGetValueType(vr) {
-    if DllCall(sc._dll "\JsGetValueType", "ptr", vr, "int*", &vt:=0) = 0
-        return vt
-}
-JsType(v) => JsGetValueType(sc._ToJs(v))
-
 JsEnumProps(value, namesOrSymbols:="Names") {
-    vr := sc._ToJs(value)
-    DllCall(sc._dll "\JsGetOwnProperty" namesOrSymbols, "ptr", vr, "ptr*", &pn:=0)
-    names := sc._JsToVt(pn), i := 0
+    names := JsRT.FromJs(JsRT.JsGetOwnProperty%namesOrSymbols%(JsRT.ToJs(value)))
+    , i := 0
     return (&a) => (++i >= names.length) ? false : (a := names.%i%, true)
 }
 
@@ -207,9 +196,9 @@ ErrorMsg(err, mode) {
         try {
             if err.name = "SyntaxError" {
                 ; Syntax errors have line, column, source and url, but not stack.
-                MsgBox Format("Syntax error at line {1:i}, column {2:i}: {3}`n`n--->`t{4}"
+                MsgBox Format("Syntax error: {3}`n`nFile:`t{5}`nLine:`t{1:i}`nCol:`t{2:i}`nSource:`t{4}"
                     , err.line, err.column, err.message = "Syntax error" ? "" : err.message
-                    , err.source),, "IconX"
+                    , err.source, err.url),, "IconX"
             } else {
                 ; Runtime errors have stack, which includes the error name and message.
                 MsgBox err.stack,, "IconX"
@@ -217,10 +206,21 @@ ErrorMsg(err, mode) {
             return true
         }
     }
-    try
-        MsgBox err.message,, "IconX"
-    catch
-        MsgBox 'Uncaught: ' String(err) ' (' Type(err) ')'
+    try {
+        stack := "", specifically := ""
+        try (!A_IsCompiled) && stack := '`n`n' RegExReplace(err.stack, 'm)^.*?\\(?=[^\\]* \(\d+\) :)', '')
+        try (err.extra != "") && specifically := "`n`nSpecifically: " err.extra
+        MsgBox err.message specifically stack,, "IconX"
+    } catch {
+        try {
+            try value := err.toString()
+            catch
+            try value := String(err)
+            catch
+                value := err
+        }
+        MsgBox "Value thrown and not caught.`n`nSpecifically: " value,, "IconX"
+    }
     return true
 }
 
@@ -236,8 +236,8 @@ RemoveAhkMenus() {
     WindowProc(hwnd, nmsg, wParam, lParam) {
         if (nmsg = 0x111 && (wParam & 0xFFFF) >= 65300) {
             switch wParam & 0xFFFF {
-                case 65406: ; No ListLines
-                case 65407: ; No ListVars
+                ; case 65406: ; No ListLines
+                ; case 65407: ; No ListVars
                 case 65400, 65303: Reload
                 case 65401, 65304: Edit
                 case 65300: ; Open
