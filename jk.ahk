@@ -34,6 +34,11 @@ Object.Prototype.toString := this => Format("[{1} object]", type(this))
 ; Initialize script engine
 js := JsRT.Edge()
 
+AddAhkObjects js
+
+JsRT.RunFile jkfile
+
+
 AddAhkObjects(scope) {
     
     ; **** FUNCTIONS ****
@@ -45,12 +50,8 @@ AddAhkObjects(scope) {
         fn := %fn_name%
         if functions_use_lowercase_initial_letter
             fn_name := RegExReplace(fn_name, "^.", "$l0")
-        ; Does fn need special handling for callbacks?
-        if cbp := callback_params.DeleteProp(fn_name) {
-            fn := BifCallWrapCallback.Bind(fn, cbp)
-        }
         ; Does fn need special handling for OutputVars?
-        else if op_array := output_params.DeleteProp(fn_name) {
+        if op_array := output_params.DeleteProp(fn_name) {
             op_return := output_params_return.DeleteProp(fn_name)
             op := Map()
             loop op_array.length
@@ -60,7 +61,7 @@ AddAhkObjects(scope) {
             fn := BifCallReturnOutputVars.Bind(fn, op, op_return)
         }
         ; Add the function
-        scope.%fn_name% := fn
+        scope.%fn_name% := WrapBif(fn)
     }
     
     ; **** VARIABLES ****
@@ -94,52 +95,41 @@ AddAhkObjects(scope) {
     ;  - ... more?
 }
 
-AddAhkObjects js
 
-/*
-nativeGetCb := CallbackCreate(getCb, "F")
-rfn := JsRT.CreateFunction(nativeGetCb, 0)
-js.test := JsRT.FromJs(rfn)
-getCb(callee, isCtor, argv, argc, state) {
-    loop (args := []).length := argc
-        args[A_Index] := JsRT.FromJs(NumGet(argv + (A_Index-1)*A_PtrSize, "ptr"))
-    D "getCb " js.Function('$', 'return $ instanceof test')(args[1])
-    return JsRT.ToJs(MsgBox)
-    ; if DllCall(sc._dll "\JsCallFunction", "ptr", rcb, "ptr", argv, "ushort", argc, "ptr*", &result:=0) {
-        ; DllCall(sc._dll "\JsGetAndClearException", "ptr*", &excp:=0)
-        ; throw JsRT.FromJs(excp)
-    ; }
+WrapBif(fn) {
+    static nativeBifCall := CallbackCreate(BifCall, "F")
+    ; Since this is only used with built-in functions, we don't need to
+    ; worry about the fact that the reference to fn will never be released
+    ; (since there's no finalizer for rfn).
+    return JsRT.FromJs(JsRT.JsCreateFunction(nativeBifCall, ObjPtrAddRef(fn)))
 }
-*/
-
-JsRT.RunFile jkfile
 
 
-BifCallWrapCallback(ahkfn, pn, p*) {
-    static f_prop := "_f_"
-    callCb(callee, isCtor, argv, argc, state) {
-        ; This serves as the entry point into JS for a new AutoHotkey thread.
-        idf := JsRT.JsGetPropertyIdFromName(f_prop)
-        rcb := JsRT.JsGetProperty(callee, idf)
-        return JsRT.JsCallFunction(rcb, argv, argc)
-    }
-    if p.Has(pn) {
-        cb := p[pn]
-        rcb := JsRT.ToJs(cb)
-        if JsRT.JsGetValueType(rcb) = 6 { ; JsFunction
-            ; idf := JsRT.JsGetPropertyIdFromName(f_prop)
-            ; rfn := JsRT.JsGetProperty(callee, idf)
-            ; if JsRT.JsGetValueType(rfn) = 0 { ; JsUndefined
-                ; static nativeCallCb := CallbackCreate(callCb, "F")
-                ; rfn := JsRT.JsCreateFunction(nativeCallCb, 0)
-                ; JsRT.JsSetProperty(rfn, idf, rcb, false)
-                ; JsRT.JsSetProperty(rcb, idf, rfn, false)
-            ; }
-            ; p[pn] := ComObjectFor(rfn)
-            p[pn] := ComObjectFor(rcb)
+BifCall(callee, isCtor, argv, argc, state) {
+    loop (args := []).length := argc - 1 {  ; - 1 to ignore 'this'
+        v := NumGet(argv + A_Index*A_PtrSize, "ptr")
+        switch t := JsRT.JsGetValueType(v) {
+            case 0: ; JsUndefined
+                continue ; Leave args[A_Index] unset.
+            case 1: ; JsNull
+                throw TypeError("Invalid use of null")
+            case 4: ; JsBoolean
+                v := JsRT.JsBooleanToBool(v) ; Avoids VT_BOOL representation of true as -1.
+            case 6: ; JsFunction
+                v := ComObjectFor(v) ; Always returns the same ComObject for a given JS object.
+            default:
+            ; case 2: ; JsNumber
+            ; case 3: ; JsString
+            ; case 5: ; JsObject
+            ; case 7: ; JsError
+            ; case 8: ; JsArray
+            ; case 9: ; JsSymbol
+                v := JsRT.FromJs(v)
         }
+        args[A_Index] := v
     }
-    return ahkfn(p*)
+    fn := ObjFromPtrAddRef(state)
+    return JsRT.ToJs(fn(args*))
 }
 
 
@@ -195,10 +185,10 @@ ErrorMsg(err, mode) {
     if ComObjType(err) {
         try {
             if err.name = "SyntaxError" {
-                ; Syntax errors have line, column, source and url, but not stack.
-                MsgBox Format("Syntax error: {3}`n`nFile:`t{5}`nLine:`t{1:i}`nCol:`t{2:i}`nSource:`t{4}"
-                    , err.line, err.column, err.message = "Syntax error" ? "" : err.message
-                    , err.source, err.url),, "IconX"
+                ; Syntax errors have message, line, column, url and source.
+                MsgBox Format("Syntax error: {1}`n`nFile:`t{2}`nLine:`t{3:i}`nCol:`t{4:i}`nSource:`t{5}"
+                    , err.message = "Syntax error" ? "" : err.message
+                    , err.url, err.line, err.column, err.source),, "IconX"
             } else {
                 ; Runtime errors have stack, which includes the error name and message.
                 MsgBox err.stack,, "IconX"
@@ -236,8 +226,8 @@ RemoveAhkMenus() {
     WindowProc(hwnd, nmsg, wParam, lParam) {
         if (nmsg = 0x111 && (wParam & 0xFFFF) >= 65300) {
             switch wParam & 0xFFFF {
-                ; case 65406: ; No ListLines
-                ; case 65407: ; No ListVars
+                case 65406: (A_IsCompiled) || ListLines() ; Allow for debug when not compiled.
+                case 65407: (A_IsCompiled) || ListVars()
                 case 65400, 65303: Reload
                 case 65401, 65304: Edit
                 case 65300: ; Open
@@ -263,6 +253,7 @@ Edit() {
 }
 
 Reload() {
+    ; FIXME: new instance might close wrong old instance if multiple jk files are running
     Run Format(A_IsCompiled ? '"{2}" /restart "{3}"' : '"{1}" /restart "{2}" "{3}"'
         , A_AhkPath, A_ScriptFullPath, jkfile), A_InitialWorkingDir
 }
