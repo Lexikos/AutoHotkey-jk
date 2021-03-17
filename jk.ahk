@@ -43,13 +43,13 @@ AddAhkObjects(scope) {
     
     ; **** FUNCTIONS ****
     #include funcs.ahk ; -> functions, callback_params, output_params, output_params_return
+    adjust_name := functions_use_lowercase_initial_letter
+        ? n => RegExReplace(n, '^.', '$l0') : n => n
     Loop Parse functions, ' ' {
         if A_LoopField ~= '\W'  ; Disabled function
             continue
         fn_name := A_LoopField
         fn := %fn_name%
-        if functions_use_lowercase_initial_letter
-            fn_name := RegExReplace(fn_name, "^.", "$l0")
         ; Does fn need special handling for OutputVars?
         if op_array := output_params.DeleteProp(fn_name) {
             op_return := output_params_return.DeleteProp(fn_name)
@@ -61,6 +61,7 @@ AddAhkObjects(scope) {
             fn := BifCallReturnOutputVars.Bind(fn, op, op_return)
         }
         ; Add the function
+        fn_name := adjust_name(fn_name)
         scope.%fn_name% := WrapBif(fn)
     }
     
@@ -97,18 +98,30 @@ AddAhkObjects(scope) {
 
 
 WrapBif(fn) {
-    static nativeBifCall := CallbackCreate(BifCall, "F")
+    static callbackFromJS := CallbackCreate(CallFromJS, "F")
     ; Since this is only used with built-in functions, we don't need to
     ; worry about the fact that the reference to fn will never be released
     ; (since there's no finalizer for rfn).
-    return JsRT.FromJs(JsRT.JsCreateFunction(nativeBifCall, ObjPtrAddRef(fn)))
+    return JsRT.FromJs(JsRT.JsCreateFunction(callbackFromJS, ObjPtrAddRef(fn)))
 }
 
 
-BifCall(callee, isCtor, argv, argc, state) {
-    loop (args := []).length := argc - 1 {  ; - 1 to ignore 'this'
-        v := NumGet(argv + A_Index*A_PtrSize, "ptr")
-        switch t := JsRT.JsGetValueType(v) {
+CallFromJS(callee, isCtor, argv, argc, state) {
+    try {
+        if JsRT.JsGetValueType(NumGet(argv, "ptr")) = 0 ; this === undefined
+            argv += A_PtrSize, argc -= 1 ; Don't pass this as a parameter.
+        return JsRT.ToJs(ObjFromPtrAddRef(state)(ConvertArgv(argv, argc)*))
+    } catch e {
+        JsRT.JsSetException(e is Error ? ErrorToJs(e) : JsRT.ToJs(e))
+        return 0
+    }
+}
+
+
+ConvertArgv(argv, argc) {
+    loop (args := []).Length := argc {
+        v := NumGet(argv + (A_Index-1)*A_PtrSize, "ptr")
+        switch JsRT.JsGetValueType(v) {
             case 0: ; JsUndefined
                 continue ; Leave args[A_Index] unset.
             case 1: ; JsNull
@@ -128,8 +141,19 @@ BifCall(callee, isCtor, argv, argc, state) {
         }
         args[A_Index] := v
     }
-    fn := ObjFromPtrAddRef(state)
-    return JsRT.ToJs(fn(args*))
+    return args
+}
+
+
+ErrorToJs(e) {
+    if e is TypeError
+        return JsRT.JsCreateTypeError(JsRT.ToJs(StrReplace(e.message, "a ComO", "an o")))
+    if e is MemberError && RegExMatch(e.message, 'named "(.*?)"', &m)
+        return JsRT.JsCreateTypeError(JsRT.ToJs("Object doesn't support property or method '" m.1 "'"))
+    ; FIXME: add Error functions to script for instanceof, and set prototype
+    je := JsRT.JsCreateError(JsRT.ToJs(e.message))
+    JsRT.FromJs(je).name := type(e)
+    return je
 }
 
 
@@ -161,23 +185,6 @@ BifCallReturnOutputVars(ahkfn, op, opr, p*) {
     for i, name in op
         o.%name% := %p[i]%       ; Put output values into JS object.
     return opr ? opr(r, o) : o   ; Return JS object, allowing variations to be handled by opr.
-}
-
-
-JsEnum(v) {
-    static getIt := js.Eval('(function(v) { return v[Symbol.iterator](); })')
-    try
-        it := getIt(v)
-    catch
-        return a => false
-    return (&a) => (s := it.next()).done ? false : (a := s.value, true)
-}
-
-
-JsEnumProps(value, namesOrSymbols:="Names") {
-    names := JsRT.FromJs(JsRT.JsGetOwnProperty%namesOrSymbols%(JsRT.ToJs(value)))
-    , i := 0
-    return (&a) => (++i >= names.length) ? false : (a := names.%i%, true)
 }
 
 
