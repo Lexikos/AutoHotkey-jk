@@ -28,13 +28,20 @@ WinSetTitle jkfile ' - AutoHotkey v' JKVersion, A_ScriptHwnd
 ; TODO: #SingleInstance replacement? /restart replacement?
 
 ; Helpers
-undefined := ComObject(0,0)
+undefined := ComObject(0,0), null := ComObject(9,0)
+jsTrue := ComObject(0xB, -1), jsFalse := ComObject(0xB, 0)
 Object.Prototype.toString := this => Format("[{1} object]", type(this))
+AdjustFuncName := functions_use_lowercase_initial_letter
+    ? n => RegExReplace(n, '^.', '$l0') : n => n
+AdjustPropName := AdjustFuncName
+AdjustClassName := n => n
 
 ; Initialize script engine
 js := JsRT.Edge()
 
 AddAhkObjects js
+
+IsSet(&D) ? js.D := WrapBif(D) : %'D'% := (*) => 0
 
 JsRT.RunFile jkfile
 
@@ -43,25 +50,13 @@ AddAhkObjects(scope) {
     
     ; **** FUNCTIONS ****
     #include funcs.ahk ; -> functions, callback_params, output_params, output_params_return
-    adjust_name := functions_use_lowercase_initial_letter
-        ? n => RegExReplace(n, '^.', '$l0') : n => n
     Loop Parse functions, ' ' {
         if A_LoopField ~= '\W'  ; Disabled function
             continue
         fn_name := A_LoopField
         fn := %fn_name%
-        ; Does fn need special handling for OutputVars?
-        if op_array := output_params.DeleteProp(fn_name) {
-            op_return := output_params_return.DeleteProp(fn_name)
-            op := Map()
-            loop op_array.length
-                if op_array.Has(A_Index)
-                    op[A_Index] := op_array[A_Index]
-            op.in_count := fn.MaxParams - op.count
-            fn := BifCallReturnOutputVars.Bind(fn, op, op_return)
-        }
         ; Add the function
-        fn_name := adjust_name(fn_name)
+        fn_name := AdjustFuncName(fn_name)
         scope.%fn_name% := WrapBif(fn)
     }
     
@@ -78,43 +73,144 @@ AddAhkObjects(scope) {
     }
     
     ; **** CLASSES ****
+    Gui.Prototype.Control := Gui.Prototype.GetOwnPropDesc('__Item').get
     for cls in [Buffer, ClipboardAll, File, Gui, InputHook, Menu, MenuBar]
-        scope.%cls.Prototype.__class% := cls
-    
-    ; Much more needs to be done for classes to work properly.
-    ; "new cls()" returns cls.prototype itself (probably a JsRT bug?).
-    ; If cls is replaced with a JS function which just calls the real
-    ; class, "x = new cls()" works but "x instanceof cls" is false.
-    ; instanceof requires a true JS function.
-    ; Probably need to reconstruct the class in JS, as wrappers.
-    ;  - AHK method names are case-insensitive, breaking the illusion
-    ;    that JS is implemented natively.
-    ;  - Methods like OnEvent can't deregister a function because it
-    ;    will have a different ComObject wrapper for each call.
-    ;  - Native AHK Object methods will be available, not native JS ones.
-    ;  - A few methods might return an AHK Object/Array/Map.
-    ;  - ... more?
+        scope.%cls.Prototype.__class% := WrapClass(cls)
 }
 
 
 WrapBif(fn) {
+    ; Does fn need special handling for OutputVars?
+    if op_array := fn.DeleteProp('output') {
+        op_return := fn.DeleteProp('returns')
+        op := Map()
+        loop op_array.length
+            if op_array.Has(A_Index)
+                op[A_Index] := op_array[A_Index]
+        op.in_count := fn.MaxParams - op.count
+        fn := BifCallReturnOutputVars.Bind(fn, op, op_return)
+    }
     static callbackFromJS := CallbackCreate(CallFromJS, "F")
     ; Since this is only used with built-in functions, we don't need to
     ; worry about the fact that the reference to fn will never be released
     ; (since there's no finalizer for rfn).
+    ; FIXME: we're now used with BoundFunc, which should be released at some point.
     return JsRT.FromJs(JsRT.JsCreateFunction(callbackFromJS, ObjPtrAddRef(fn)))
 }
 
 
 CallFromJS(callee, isCtor, argv, argc, state) {
     try {
+        fn := ObjFromPtrAddRef(state)
+        if isCtor & 0xff
+            throw TypeError(fn.Name ' is not a constructor')
         if JsRT.JsGetValueType(NumGet(argv, "ptr")) = 0 ; this === undefined
             argv += A_PtrSize, argc -= 1 ; Don't pass this as a parameter.
-        return JsRT.ToJs(ObjFromPtrAddRef(state)(ConvertArgv(argv, argc)*))
+        args := ConvertArgv(argv, argc)
+        if HasProp(fn, 'belongsTo') && not HasBase(args[1], fn.belongsTo)
+            throw TypeError("'this' is not a " fn.belongsTo.__Class) ; More authentic than the default error.
+        return ToJs(fn(args*))
     } catch e {
-        JsRT.JsSetException(e is Error ? ErrorToJs(e) : JsRT.ToJs(e))
+        JsRT.JsSetException ErrorToJs(e)
         return 0
     }
+}
+
+
+CallClassFromJS(callee, isCtor, argv, argc, state) {
+    try {
+        this := NumGet(argv, "ptr"), cls := ObjFromPtrAddRef(state)
+        if !(isCtor & 0xff)
+            throw TypeError(cls.Prototype.__Class ' cannot be called without the new keyword')
+        if !JsRT.JsInstanceOf(this, callee)
+            throw TypeError("'this' is not a " cls.Prototype.__Class)
+        realthis := cls(ConvertArgv(argv + A_PtrSize, argc - 1)*)
+        JsRT.FromJs(this).__ahk := realthis
+        return this
+    } catch e {
+        if e is ValueError && cls.Call = Object.Call
+            e := TypeError(cls.Prototype.__Class " cannot be instantiated directly")
+        JsRT.JsSetException ErrorToJs(e)
+        return 0
+    }
+}
+
+
+WrapClass(acls) {
+    static jsClassFor := Map()
+    if ObjHasOwnProp(acls, '__js')
+        return acls.__js
+    static callbackFromJS := CallbackCreate(CallClassFromJS, "F")
+    jcls := JsRT.FromJs(rjcls := JsRT.JsCreateFunction(callbackFromJS, ObjPtrAddRef(acls)))
+    acls          .__js := jcls
+    acls.Prototype.__js := jcls.prototype
+    WrapMethods acls          , jcls
+    WrapMethods acls.Prototype, jcls.prototype
+    if acls.base != Object {
+        JsRT.JsSetPrototype(rjcls, JsRT.ToJs(jb := WrapClass(acls.base)))
+        JsRT.JsSetPrototype(JsRT.ToJs(jcls.prototype), JsRT.ToJs(jb.prototype))
+    }
+    static setTag := js.Function('obj', 'tag', 'obj[Symbol.toStringTag] = tag')
+    setTag jcls.prototype, acls.Prototype.__Class
+    return jcls
+}
+
+
+WrapMethods(aobj, jobj) {
+    defProp := js.Object.defineProperty
+    for p in aobj.OwnProps() {
+        if SubStr(p, 1, 2) = '__' {
+            if p = '__Enum'
+                SetIterator jobj, aobj.%p%
+            continue
+        }
+        pd := aobj.GetOwnPropDesc(p)
+        for name, value in pd.OwnProps()
+            if value is Func
+                value.belongsTo := aobj
+        if pd.HasProp('value') {
+            if pd.value is Func {
+                pd.value := WrapBif(pd.value)
+                p := AdjustFuncName(p)
+            }
+            else if pd.value is Class {
+                pd.value := WrapClass(pd.value)
+                p := AdjustClassName(p)
+            }
+            else ; Could be __Class or Prototype.
+                continue ; No other value properties are wanted at the moment.
+        }
+        else if pd.HasProp('call') {
+            pd := {value: WrapBif(pd.call)}
+            p := AdjustFuncName(p)
+        }
+        else {
+            if pd.HasProp('get')
+                pd.get := WrapBif(pd.get)
+            if pd.HasProp('set')
+                pd.set := WrapBif(pd.set)
+            p := AdjustPropName(p)
+        }
+        pd.enumerable := true
+        defProp jobj, p, pd
+    }
+}
+
+
+SetIterator(jobj, f) {
+    static setIt := js.Function('v', 'f', 'v[Symbol.iterator] = f')
+    get_iterator(f, this) {
+        next(f, this) {
+            o := js.Object()
+            if (o.done := f(&v) ? jsFalse : jsTrue) = jsFalse ; true means continue for AutoHotkey, finished for JS.
+                o.value := v
+            return o
+        }
+        proto := js.Object()
+        proto.next := WrapBif(next.Bind(f(this, 1)))
+        return proto
+    }
+    setIt jobj, WrapBif(get_iterator.Bind(f))
 }
 
 
@@ -128,14 +224,22 @@ ConvertArgv(argv, argc) {
                 throw TypeError("Invalid use of null")
             case 4: ; JsBoolean
                 v := JsRT.JsBooleanToBool(v) ; Avoids VT_BOOL representation of true as -1.
+            case 5: ; JsObject
+                ; Not sure if this is actually more efficient than JsRT.FromJs(v).__ahk,
+                ; but in theory it avoids an additional JsValRef -> IDispatch -> ComObject.
+                id_ahk := JsRT.JsGetPropertyIdFromName('__ahk')
+                p := JsRT.JsGetProperty(v, id_ahk)
+                if JsRT.JsGetValueType(p) != 0
+                    v := p
+                v := JsRT.FromJs(v)
             case 6: ; JsFunction
                 v := ComObjectFor(v) ; Always returns the same ComObject for a given JS object.
+            case 8: ; JsArray
+                v := [ValuesOf(JsRT.FromJs(v))*]
             default:
             ; case 2: ; JsNumber
             ; case 3: ; JsString
-            ; case 5: ; JsObject
             ; case 7: ; JsError
-            ; case 8: ; JsArray
             ; case 9: ; JsSymbol
                 v := JsRT.FromJs(v)
         }
@@ -145,7 +249,25 @@ ConvertArgv(argv, argc) {
 }
 
 
+ToJs(v) {
+    if v is Object {
+        if ObjHasOwnProp(b := ObjGetBase(v), '__js')
+            return JsRT.ToJs((jv := js.Object.create(b.__js), jv.__ahk := v, jv))
+        if b = Object.prototype {
+            jv := js.Object()
+            for pn, pv in ObjOwnProps(v)
+                jv.%pn% := pv
+            return JsRT.ToJs(jv)
+        }
+        D 'no conversion for ' type(v)
+    }
+    return JsRT.ToJs(v)
+}
+
+
 ErrorToJs(e) {
+    if not e is Error
+        return JsRT.ToJs(e)
     if e is TypeError
         return JsRT.JsCreateTypeError(JsRT.ToJs(StrReplace(e.message, "a ComO", "an o")))
     if e is MemberError && RegExMatch(e.message, 'named "(.*?)"', &m)
@@ -183,8 +305,15 @@ BifCallReturnOutputVars(ahkfn, op, opr, p*) {
     r := ahkfn(p*)               ; Call original function.
     o := js.Object()
     for i, name in op
-        o.%name% := %p[i]%       ; Put output values into JS object.
+        o.%name% := %p[i]%       ; Put output values into JS object.  Currently does not wrap objects, since p[i] is never an object for the currently enabled BIFs.
     return opr ? opr(r, o) : o   ; Return JS object, allowing variations to be handled by opr.
+}
+
+
+ValuesOf(v) {
+    static getIt := js.Function('v', 'return v[Symbol.iterator]()')
+    it := getIt(v)
+    return (&a) => (s := it.next()).done ? false : (a := s.value, true)
 }
 
 

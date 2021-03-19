@@ -57,52 +57,34 @@ WinSetStyle WinSetTitle WinSetTransColor WinSetTransparent WinShow WinWait
 WinWaitActive WinWaitClose WinWaitNotActive
 )"
 
-; Functions which accept a callback need special handling to ensure the
-; same object is passed each time.  The parameter number is 1-based.
-callback_params := {
-    CallbackCreate: 1,
-    HotIf: 1,
-    Hotkey: 2,
-    OnClipboardChange: 1,
-    OnError: 1,
-    OnExit: 1,
-    OnMessage: 2,
-    SetTimer: 1,
-}
-
 ; Output parameters are indicated by position in the array and given
 ; names suitable for properties of a returned object.
-output_params := {
-    CaretGetPos: ['x', 'y'],
-    ControlGetPos: ['x', 'y', 'width', 'height'],
-    FileGetShortcut: [, 'target', 'dir', 'args', 'description', 'icon', 'iconNum', 'runState'],
-    ImageSearch: ['x', 'y'],
-    LoadPicture: [, , 'imageType'],
-    MonitorGet: [, 'left', 'top', 'right', 'bottom'],
-    MonitorGetWorkArea: [, 'left', 'top', 'right', 'bottom'],
-    MouseGetPos: ['x', 'y', 'win', 'control'],
-    PixelSearch: ['x', 'y'],
-    ; RegExMatch: [, , 3],
-    ; RegExReplace: [, , , 4],
-    Run: [, , , 'pid'],
-    RunWait: [, , , 'pid'],
-    SplitPath: [, 'name', 'dir', 'ext', 'nameNoExt', 'drive'],
-    ; StrReplace: [, , , , 5],
-    ; VarSetStrCapacity: [1],
-    WinGetClientPos: ['x', 'y', 'width', 'height'],
-    WinGetPos: ['x', 'y', 'width', 'height'],
-}
+CaretGetPos.output := ['x', 'y']
+ControlGetPos.output := ['x', 'y', 'width', 'height']
+FileGetShortcut.output := [, 'target', 'dir', 'args', 'description', 'icon', 'iconNum', 'runState']
+ImageSearch.output := ['x', 'y']
+LoadPicture.output := [, , 'imageType']
+MonitorGet.output := MonitorGetWorkArea.output := [, 'left', 'top', 'right', 'bottom']
+MouseGetPos.output := ['x', 'y', 'win', 'control']
+PixelSearch.output := ['x', 'y']
+; RegExMatch.output := [, , 'match']
+; RegExReplace.output := [, , , 'count']
+Run.output := RunWait.output := [, , , 'pid']
+SplitPath.output := [, 'name', 'dir', 'ext', 'nameNoExt', 'drive']
+; StrReplace.output := [, , , , 'count']
+WinGetClientPos.output := WinGetPos.output := ['x', 'y', 'width', 'height']
+Gui.Prototype.GetPos.output
+:= Gui.Prototype.GetClientPos.output
+:= Gui.Control.Prototype.GetPos.output := [, 'x', 'y', 'width', 'height']
 
 ; These callback functions act as an additional filter for functions
-; listed in output_params.
+; with an Output property (listed above).
 ; Param #1 (r): the original return value.
 ; Param #2 (o): an object with one property for each name from output_params.
 ; Should return: the final return value.
-output_params_return := {
-    CaretGetPos: (r, o) => (r ? o : ''),
-    ImageSearch: (r, o) => (r ? o : ''),
-    LoadPicture: (r, o) => (o.handle := r, o),
-    PixelSearch: (r, o) => (r ? o : ''),
-    Run: (r, o) => o.pid,
-    RunWait: (r, o) => (o.exitCode := r, o),
-}
+CaretGetPos.returns := (r, o) => (r ? o : jsFalse)
+ImageSearch.returns := (r, o) => (r ? o : jsFalse)
+LoadPicture.returns := (r, o) => (o.handle := r, o)
+PixelSearch.returns := (r, o) => (r ? o : jsFalse)
+Run.returns := (r, o) => o.pid
+RunWait.returns := (r, o) => (o.exitCode := r, o)
