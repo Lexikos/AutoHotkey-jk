@@ -23,7 +23,7 @@ ParseCommandLine() {
     global jkfile := ""
     global default_script_encoding := "UTF-8"
     global J_Args := GetCommandLineArgs() ; Get all, including those processed by AutoHotkey.
-    is_restart := false
+    global is_restart := false
     drop_jk_ahk := !A_IsCompiled
     J_Args.RemoveAt 1 ; Drop the exe.
     loop {
@@ -33,6 +33,8 @@ ParseCommandLine() {
             default_script_encoding := SubStr(J_Args[1], 2)
         else if J_Args[1] ~= 'i)^/ErrorStdOut'
         {} ; TODO: handle /ErrorStdOut
+        else if J_Args[1] ~= 'i)^/Debug(?:=|$)' && drop_jk_ahk
+        {}
         else if drop_jk_ahk && J_Args[1] ~= 'i)(?:[\\/]|^)\Q' A_ScriptName '\E$'
             drop_jk_ahk := false
         else
@@ -52,18 +54,11 @@ ParseCommandLine() {
         MsgBox "Script file not found.",, "IconX"
         ExitApp
     }
-    if is_restart
-        TerminatePreviousInstance "Reload"
 }
 
 WinSetTitle jktitle := jkfile ' - AutoHotkey v' JKVersion, A_ScriptHwnd
-SplitPath jkfile, &A_ScriptName
-; TODO: #SingleInstance replacement? /restart replacement?
-
-TerminatePreviousInstance(by) {
-    AHK_EXIT_BY_RELOAD := 1030
-    AHK_EXIT_BY_SINGLEINSTANCE := 1031
-}
+if is_restart
+    TerminatePreviousInstance 'Reload'
 
 ; Helpers
 undefined := ComObject(0,0), null := ComObject(9,0)
@@ -77,6 +72,9 @@ AdjustClassName := n => n
 js := JsRT.Edge()
 
 AddAhkObjects js
+SplitPath jkfile, &A_ScriptName
+A_IconTip := A_ScriptName
+js.singleInstance := WrapBif(SingleInstance)
 js.A_Args := js.Array(J_Args*)
 
 IsSet(&D) ? js.D := WrapBif(D) : %'D'% := (*) => 0
@@ -430,4 +428,42 @@ Reload() {
     ; FIXME: new instance might close wrong old instance if multiple jk files are running
     Run Format(A_IsCompiled ? '"{2}" /restart "{3}"' : '"{1}" "{2}" /restart "{3}"'
         , A_AhkPath, A_ScriptFullPath, jkfile), A_InitialWorkingDir
+}
+
+SingleInstance(mode:='force') {
+    switch StrLower(mode) {
+        case 'force':
+            TerminatePreviousInstance 'SingleInstance'
+        case 'ignore':
+            for hwnd in WinGetList(jktitle " ahk_class AutoHotkey")
+                if hwnd != A_ScriptHwnd
+                    ExitApp
+        default:
+            throw ValueError('Invalid mode "' mode '"')
+    }
+}
+
+
+TerminatePreviousInstance(by) {
+    DetectHiddenWindows (dhw := A_DetectHiddenWindows, true)
+    for hwnd in WinGetList(jktitle " ahk_class AutoHotkey") {
+        if hwnd != A_ScriptHwnd {
+            TerminateInstance hwnd, by
+            break
+        }
+    }
+    DetectHiddenWindows dhw
+}
+
+TerminateInstance(hwnd, by) {
+    static WM_COMMNOTIFY := 0x44
+    static AHK_EXIT_BY_RELOAD := 1030
+    static AHK_EXIT_BY_SINGLEINSTANCE := 1031
+    PostMessage WM_COMMNOTIFY, AHK_EXIT_BY_%by%, 0, hwnd
+    Loop {
+        if WinWaitClose(hwnd,, 2)
+            break
+        if MsgBox("Could not close the previous instance of this script.  Keep waiting?",, "y/n") = "no"
+            ExitApp 2
+    }
 }
