@@ -5,6 +5,7 @@ functions_use_lowercase_initial_letter := true
 
 ; Required libraries
 #include ..\ActiveScript\JsRT.ahk
+#include GetCommandLineArgs.ahk
 #include <D>
 
 #SingleInstance Off
@@ -17,22 +18,58 @@ RemoveAhkMenus
 ; SetTimer () => A_IconHidden := false, -50
 
 ; Process command line
-jkfile := ""
-Loop Files A_Args.Length ? A_Args[1] : "test.jk"
-    jkfile := A_LoopFileFullPath
-if jkfile = "" {
-    MsgBox 'A script file must be specified on the command line or by drag-dropping it into the program file. The program will now exit.',, 'Iconi'
-    ExitApp
+ParseCommandLine
+ParseCommandLine() {
+    global jkfile := ""
+    global default_script_encoding := "UTF-8"
+    global J_Args := GetCommandLineArgs() ; Get all, including those processed by AutoHotkey.
+    is_restart := false
+    drop_jk_ahk := !A_IsCompiled
+    J_Args.RemoveAt 1 ; Drop the exe.
+    loop {
+        if J_Args[1] ~= 'i)^/r(?:estart)$'
+            is_restart := true
+        else if J_Args[1] ~= 'i)^/cp\d+$'
+            default_script_encoding := SubStr(J_Args[1], 2)
+        else if J_Args[1] ~= 'i)^/ErrorStdOut'
+        {} ; TODO: handle /ErrorStdOut
+        else if drop_jk_ahk && J_Args[1] ~= 'i)(?:[\\/]|^)\Q' A_ScriptName '\E$'
+            drop_jk_ahk := false
+        else
+            break
+        J_Args.RemoveAt 1
+    } until J_Args.Length = 0
+    jkfile_found := false
+    Loop Files J_Args.Length ? (jkfile := J_Args.RemoveAt(1)) : "test.jk" {
+        jkfile := A_LoopFileFullPath
+        jkfile_found := true
+    }
+    if jkfile = "" {
+        MsgBox 'A script file must be specified on the command line or by drag-dropping it onto the program file. The program will now exit.',, 'Iconi'
+        ExitApp
+    }
+    if !jkfile_found {
+        MsgBox "Script file not found.",, "IconX"
+        ExitApp
+    }
+    if is_restart
+        TerminatePreviousInstance "Reload"
 }
-WinSetTitle jkfile ' - AutoHotkey v' JKVersion, A_ScriptHwnd
+
+WinSetTitle jktitle := jkfile ' - AutoHotkey v' JKVersion, A_ScriptHwnd
+SplitPath jkfile, &A_ScriptName
 ; TODO: #SingleInstance replacement? /restart replacement?
+
+TerminatePreviousInstance(by) {
+    AHK_EXIT_BY_RELOAD := 1030
+    AHK_EXIT_BY_SINGLEINSTANCE := 1031
+}
 
 ; Helpers
 undefined := ComObject(0,0), null := ComObject(9,0)
 jsTrue := ComObject(0xB, -1), jsFalse := ComObject(0xB, 0)
-Object.Prototype.toString := this => Format("[{1} object]", type(this))
 AdjustFuncName := functions_use_lowercase_initial_letter
-    ? n => RegExReplace(n, '^.', '$l0') : n => n
+    ? n => RegExReplace(n, '^[A-Z]+', '$l0') : n => n
 AdjustPropName := AdjustFuncName
 AdjustClassName := n => n
 
@@ -40,10 +77,11 @@ AdjustClassName := n => n
 js := JsRT.Edge()
 
 AddAhkObjects js
+js.A_Args := js.Array(J_Args*)
 
 IsSet(&D) ? js.D := WrapBif(D) : %'D'% := (*) => 0
 
-JsRT.RunFile jkfile
+JsRT.RunFile jkfile, default_script_encoding
 
 
 AddAhkObjects(scope) {
@@ -390,6 +428,6 @@ Edit() {
 
 Reload() {
     ; FIXME: new instance might close wrong old instance if multiple jk files are running
-    Run Format(A_IsCompiled ? '"{2}" /restart "{3}"' : '"{1}" /restart "{2}" "{3}"'
+    Run Format(A_IsCompiled ? '"{2}" /restart "{3}"' : '"{1}" "{2}" /restart "{3}"'
         , A_AhkPath, A_ScriptFullPath, jkfile), A_InitialWorkingDir
 }
