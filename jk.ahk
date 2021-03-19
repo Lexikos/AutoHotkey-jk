@@ -59,6 +59,8 @@ ParseCommandLine() {
 WinSetTitle jktitle := jkfile ' - AutoHotkey v' JKVersion, A_ScriptHwnd
 if is_restart
     TerminatePreviousInstance 'Reload'
+SplitPath jkfile, &A_ScriptName
+A_IconTip := A_ScriptName
 
 ; Helpers
 undefined := ComObject(0,0), null := ComObject(9,0)
@@ -72,9 +74,8 @@ AdjustClassName := n => n
 js := JsRT.Edge()
 
 AddAhkObjects js
-SplitPath jkfile, &A_ScriptName
-A_IconTip := A_ScriptName
-js.singleInstance := WrapBif(SingleInstance)
+
+
 js.A_Args := js.Array(J_Args*)
 
 IsSet(&D) ? js.D := WrapBif(D) : %'D'% := (*) => 0
@@ -83,6 +84,7 @@ JsRT.RunFile jkfile, default_script_encoding
 
 
 AddAhkObjects(scope) {
+    defProp := scope.Object.defineProperty
     
     ; **** FUNCTIONS ****
     #include funcs.ahk ; -> functions, callback_params, output_params, output_params_return
@@ -96,11 +98,16 @@ AddAhkObjects(scope) {
         scope.%fn_name% := WrapBif(fn)
     }
     
+    ; **** CLASSES ****
+    Gui.Prototype.Control := Gui.Prototype.GetOwnPropDesc('__Item').get
+    for cls in [Buffer, ClipboardAll, File, Gui, InputHook, Menu, MenuBar]
+        scope.%cls.Prototype.__class% := WrapClass(cls)
+    
     ; **** VARIABLES ****
     #include vars.ahk
+    variables.TrayMenu := WrapObject(A_TrayMenu)
     get_var(name)        => %name%
     set_var(name, value) => %name% := value
-    defProp := scope.Object.defineProperty
     for name, value in variables.OwnProps() {
         defProp scope, 'A_' name, value is readable ? {
             get:                          get_var.Bind('A_' name),
@@ -108,10 +115,8 @@ AddAhkObjects(scope) {
         } : value is Object ? value : {value: value}
     }
     
-    ; **** CLASSES ****
-    Gui.Prototype.Control := Gui.Prototype.GetOwnPropDesc('__Item').get
-    for cls in [Buffer, ClipboardAll, File, Gui, InputHook, Menu, MenuBar]
-        scope.%cls.Prototype.__class% := WrapClass(cls)
+    ; **** REPLACEMENTS FOR DIRECTIVES ***
+    js.singleInstance := WrapBif(SingleInstance)
 }
 
 
@@ -285,18 +290,23 @@ ConvertArgv(argv, argc) {
 }
 
 
-ToJs(v) {
-    if v is Object {
-        if ObjHasOwnProp(b := ObjGetBase(v), '__js')
-            return JsRT.ToJs((jv := js.Object.create(b.__js), jv.__ahk := v, jv))
-        if b = Object.prototype {
-            jv := js.Object()
-            for pn, pv in ObjOwnProps(v)
-                jv.%pn% := pv
-            return JsRT.ToJs(jv)
-        }
-        D 'no conversion for ' type(v)
+WrapObject(v) {
+    if ObjHasOwnProp(b := ObjGetBase(v), '__js')
+        return (jv := js.Object.create(b.__js), jv.__ahk := v, jv)
+    if b = Object.prototype {
+        jv := js.Object()
+        for pn, pv in ObjOwnProps(v)
+            jv.%pn% := pv
+        return jv
     }
+    D 'no conversion for ' type(v)
+    return v
+}
+
+
+ToJs(v) {
+    if v is Object
+        v := WrapObject(v)
     return JsRT.ToJs(v)
 }
 
