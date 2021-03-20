@@ -70,6 +70,9 @@ AdjustClassName := n => n
 ; Initialize script engine
 js := JsRT.Edge()
 
+MIN_SAFE_INTEGER := js.Number.MIN_SAFE_INTEGER
+MAX_SAFE_INTEGER := js.Number.MAX_SAFE_INTEGER
+
 AddAhkObjects js
 
 ; Debug
@@ -313,6 +316,8 @@ ObjectToJs(v) {
 ToJs(v) {
     if v is Object
         return ObjectToJs(v)
+    if v is Integer && (v < MIN_SAFE_INTEGER || v > MAX_SAFE_INTEGER)
+        v := String(v)
     return JsRT.ToJs(v)
 }
 
