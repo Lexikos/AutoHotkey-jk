@@ -100,6 +100,7 @@ AddAhkObjects(scope) {
         fn_name := AdjustFuncName(fn_name)
         scope.%fn_name% := WrapBif(fn)
     }
+    scope.%AdjustFuncName('CollectGarbage')% := WrapBif(JsRT.JsCollectGarbage.Bind(JsRT, JsRT._runtime))
     
     ; **** CLASSES ****
     Gui.Prototype.Control := Gui.Prototype.GetOwnPropDesc('__Item').get
