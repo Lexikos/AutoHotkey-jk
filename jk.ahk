@@ -122,7 +122,7 @@ AddAhkObjects(scope) {
     }
     
     ; **** REPLACEMENTS FOR DIRECTIVES ***
-    for fn in [SingleInstance, Include, Persistent]
+    for fn in [Include, InstallKeybdHook, InstallMouseHook, Persistent, SingleInstance]
         scope.%AdjustFuncName(fn.Name)% := WrapBif(fn)
 }
 
@@ -482,6 +482,26 @@ Include(path) {
 
 Persistent() {
     OnMessage(0xBADC0DE, (*) => "")
+}
+
+
+InstallKeybdHook() {
+    static ih
+    if IsSet(&ih)
+        return
+    ih := InputHook('I255 L0 B V')
+    ih.Start
+}
+
+
+InstallMouseHook() {
+    ; If a custom combination uses the same key as both prefix and suffix,
+    ; it will never execute.  Even if it did, it would have no effect and
+    ; is unlikely to conflict with an existing hotkey for obvious reasons.
+    Hotkey '~XButton2 & ~XButton2', _ => 0
+    ; Note: To undo this later, it's necessary to know which HotIf context
+    ; was active, and currently that's impossible unless you set it yourself.
+    ; To do this without affecting the caller's HotIf, create a new thread.
 }
 
 
