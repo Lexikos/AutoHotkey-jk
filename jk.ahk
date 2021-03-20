@@ -107,7 +107,7 @@ AddAhkObjects(scope) {
     
     ; **** CLASSES ****
     Gui.Prototype.Control := Gui.Prototype.GetOwnPropDesc('__Item').get
-    for cls in [Buffer, ClipboardAll, File, Gui, InputHook, Menu, MenuBar]
+    for cls in [ClipboardAll, File, Gui, InputHook, Menu, MenuBar]
         scope.%cls.Prototype.__class% := WrapClass(cls)
     
     ; **** VARIABLES ****
@@ -280,6 +280,12 @@ ArrayFromArgv(argv, argc) {
                 v := JsFunctionProxy(v) ; May return an existing proxy if v has one.
             case 8: ; JsArray
                 v := [ValuesOf(JsRT.FromJs(v))*]
+            case 10: ; JsArrayBuffer
+                v := JsArrayBufferProxy(v)
+            case 11: ; JsTypedArray
+                v := JsTypedArrayProxy(v)
+            case 12: ; JsDataView
+                v := JsDataViewProxy(v)
             default:
             ; case 2: ; JsNumber
             ; case 3: ; JsString
@@ -360,7 +366,7 @@ ExternalProperty(rv, name, ptr:=unset) {
 }
 
 
-class JsObjectProxyBase {
+class JsCachingProxy {
     static Call(rj) {
         if p := ExternalProperty(rj, '__p')
             return ObjFromPtrAddRef(p)
@@ -388,11 +394,37 @@ class JsObjectProxyBase {
 }
 
 
-class JsFunctionProxy extends JsObjectProxyBase {
+class JsFunctionProxy extends JsCachingProxy {
     Call(params*) => (this.__j)(params*)
     MinParams => 0
     MaxParams => 0
     IsVariadic => true
+}
+
+
+class JsBufferProxy {
+    __new(rj) => JsRT.JsAddRef(this.__rj := rj)
+    __delete() => JsRT.JsRelease(this.__rj)
+    Ptr => (this._GetStorage(&ptr), ptr)
+    Size => (this._GetStorage(, &size), size)
+}
+
+class JsArrayBufferProxy extends JsBufferProxy {
+    _GetStorage(&ptr:=unset, &length:=unset) {
+        JsRT.JsGetArrayBufferStorage(this.__rj, &ptr:=0, &length:=0)
+    }
+}
+
+class JsTypedArrayProxy extends JsBufferProxy {
+    _GetStorage(&ptr:=unset, &length:=unset) {
+        JsRT.JsGetTypedArrayStorage(this.__rj, &ptr:=0, &length:=0, 0, 0)
+    }
+}
+
+class JsDataViewProxy extends JsBufferProxy {
+    _GetStorage(&ptr:=unset, &length:=unset) {
+        JsRT.JsGetDataViewStorage(this.__rj, &ptr:=0, &length:=0)
+    }
 }
 
 
