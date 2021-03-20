@@ -111,7 +111,7 @@ AddAhkObjects(scope) {
     GetLineNumber := js.Function('return parseInt(/\((.+?:.+?):(\d+):\d+\)/.exec(Error().stack)[2]);')
     #include vars.ahk
     defProp scope, 'A_Args', {value: js.Array(J_Args*), writable: true}
-    variables.TrayMenu := WrapObject(A_TrayMenu)
+    variables.TrayMenu := JsRT.FromJs(ObjectToJs(A_TrayMenu))
     get_var(name)        => %name%
     set_var(name, value) => %name% := value
     for name, value in variables.OwnProps() {
@@ -172,9 +172,7 @@ CallClassFromJS(callee, isCtor, argv, argc, state) {
             throw TypeError(cls.Prototype.__Class ' cannot be called without the new keyword')
         if !JsRT.JsInstanceOf(this, callee)
             throw TypeError("'this' is not a " cls.Prototype.__Class)
-        realthis := cls(ArrayFromArgv(argv + A_PtrSize, argc - 1)*)
-        JsRT.FromJs(this).__ahk := realthis
-        return this
+        return ObjectToJs(cls(ArrayFromArgv(argv + A_PtrSize, argc - 1)*))
     } catch e {
         if e is ValueError && cls.Call = Object.Call
             e := TypeError(cls.Prototype.__Class " cannot be instantiated directly")
@@ -273,15 +271,9 @@ ArrayFromArgv(argv, argc) {
             case 4: ; JsBoolean
                 v := JsRT.JsBooleanToBool(v) ; Avoids VT_BOOL representation of true as -1.
             case 5: ; JsObject
-                ; Not sure if this is actually more efficient than JsRT.FromJs(v).__ahk,
-                ; but in theory it avoids an additional JsValRef -> IDispatch -> ComObject.
-                id_ahk := JsRT.JsGetPropertyIdFromName('__ahk')
-                p := JsRT.JsGetProperty(v, id_ahk)
-                if JsRT.JsGetValueType(p) != 0
-                    v := p
-                v := JsRT.FromJs(v)
+                v := ObjectFromJs(v)
             case 6: ; JsFunction
-                v := ComObjectFor(v) ; Always returns the same ComObject for a given JS object.
+                v := JsFunctionProxy(v) ; May return an existing proxy if v has one.
             case 8: ; JsArray
                 v := [ValuesOf(JsRT.FromJs(v))*]
             default:
@@ -297,23 +289,29 @@ ArrayFromArgv(argv, argc) {
 }
 
 
-WrapObject(v) {
-    if ObjHasOwnProp(b := ObjGetBase(v), '__js')
-        return (jv := js.Object.create(b.__js), jv.__ahk := v, jv)
+ObjectToJs(v) {
+    if ObjHasOwnProp(v, '__rj')
+        return v.__rj
+    if ObjHasOwnProp(b := ObjGetBase(v), '__js') {
+        static finalizer := CallbackCreate(p => ObjFromPtr(p).DeleteProp('__rj'), 'F', 1)
+        rj := JsRT.JsCreateExternalObject(ObjPtrAddRef(v), finalizer)
+        JsRT.JsSetPrototype(rj, JsRT.ToJs(b.__js))
+        return v.__rj := rj
+    }
     if b = Object.prototype {
         jv := js.Object()
         for pn, pv in ObjOwnProps(v)
             jv.%pn% := pv
-        return jv
+        return JsRT.ToJs(jv)
     }
     D 'no conversion for ' type(v)
-    return v
+    return JsRT.ToJs(v)
 }
 
 
 ToJs(v) {
     if v is Object
-        v := WrapObject(v)
+        return ObjectToJs(v)
     return JsRT.ToJs(v)
 }
 
@@ -332,20 +330,63 @@ ErrorToJs(e) {
 }
 
 
-ComObjectFor(rv) {
-    static x_prop := "_x_"
-    idx := JsRT.JsGetPropertyIdFromName(x_prop)
-    rx := JsRT.JsGetProperty(rv, idx)
+ObjectFromJs(rj) {
+    if JsRT.JsHasExternalData(rj)
+        return ObjFromPtrAddRef(JsRT.JsGetExternalData(rj))
+    return JsRT.FromJs(rj)
+}
+
+
+ExternalProperty(rv, name, ptr:=unset) {
+    id := JsRT.JsGetPropertyIdFromName(name)
+    rx := JsRT.JsGetProperty(rv, id)
     if JsRT.JsGetValueType(rx) = 0 { ; JsUndefined
-        obj := JsRT.FromJs(rv)
-        static finalizer := CallbackCreate(ObjRelease, "F", 1)
-        rx := JsRT.JsCreateExternalObject(ObjPtrAddRef(obj), finalizer)
-        JsRT.JsSetProperty(rv, idx, rx, true)
-    } else {
-        pobj := JsRT.JsGetExternalData(rx)
-        obj := ObjFromPtrAddRef(pobj)
+        if !IsSet(&ptr) || !ptr
+            return 0
+        rx := JsRT.JsCreateExternalObject(ptr, 0)
+        JsRT.JsSetProperty(rv, id, rx, true)
     }
-    return obj
+    else if IsSet(&ptr)
+        JsRT.JsSetExternalData(rx, ptr)
+    else
+        ptr := JsRT.JsGetExternalData(rx)
+    return ptr
+}
+
+
+class JsObjectProxyBase {
+    static Call(rj) {
+        if p := ExternalProperty(rj, '__p')
+            return ObjFromPtrAddRef(p)
+        return super(rj)
+    }
+    __New(rj) {
+        this.__j := JsRT.FromJs(rj)
+        this.__rj := rj
+        ; If a function is passed to SetTimer, OnMessage, etc. twice, it needs to
+        ; be the same proxy object both times.  Built-in COM support would just
+        ; create a new ComObject wrapper, which wouldn't allow an existing timer
+        ; or callback to be deleted/unregistered.
+        ; The naive approach is to create a ComObject once and store it in the JS
+        ; object; but that creates a circular reference and prevents the objects
+        ; from ever being deleted.  Instead, store an uncounted reference.
+        ExternalProperty rj, '__p', ObjPtr(this)
+    }
+    __Delete() {
+        ; If the proxy is deleted, that means the program hasn't kept a reference
+        ; to it, so it's okay for any future calls to pass a new proxy object.
+        ; __p must be cleared because the JS object might still be referenced by
+        ; the script (if it's not, this.__j was keeping it alive).
+        ExternalProperty this.__rj, '__p', 0
+    }
+}
+
+
+class JsFunctionProxy extends JsObjectProxyBase {
+    Call(params*) => (this.__j)(params*)
+    MinParams => 0
+    MaxParams => 0
+    IsVariadic => true
 }
 
 
