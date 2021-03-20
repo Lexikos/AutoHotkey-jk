@@ -23,6 +23,7 @@ ParseCommandLine() {
     global default_script_encoding := "UTF-8"
     global J_Args := GetCommandLineArgs() ; Get all, including those processed by AutoHotkey.
     global is_restart := false
+    global ErrorStdOut := false
     drop_jk_ahk := !A_IsCompiled
     J_Args.RemoveAt 1 ; Drop the exe.
     loop {
@@ -30,8 +31,8 @@ ParseCommandLine() {
             is_restart := true
         else if J_Args[1] ~= 'i)^/cp\d+$'
             default_script_encoding := SubStr(J_Args[1], 2)
-        else if J_Args[1] ~= 'i)^/ErrorStdOut'
-        {} ; TODO: handle /ErrorStdOut
+        else if J_Args[1] ~= 'i)^/ErrorStdOut(?:=|$)'
+            ErrorStdOut := FileOpen('**', 'w', SubStr(J_Args[1], 14))
         else if J_Args[1] ~= 'i)^/Debug(?:=|$)' && drop_jk_ahk
         {}
         else if drop_jk_ahk && J_Args[1] ~= 'i)(?:[\\/]|^)\Q' A_ScriptName '\E$'
@@ -78,7 +79,10 @@ AddAhkObjects js
 ; Debug
 IsSet(&D) ? js.D := WrapBif(D) : %'D'% := _ => ""
 
+loading_script := true   ; ExitApp if a SyntaxError is encountered while loading.
 JsRT.RunFile J_ScriptFullPath, default_script_encoding
+loading_script := false  ; Consider the loading phase complete.
+ErrorStdOut := false     ; Use it only while loading.
 
 
 AddAhkObjects(scope) {
@@ -370,9 +374,15 @@ ErrorMsg(err, mode) {
         try {
             if err.name = "SyntaxError" {
                 ; Syntax errors have message, line, column, url and source.
-                MsgBox Format("Syntax error: {1}`n`nFile:`t{2}`nLine:`t{3:i}`nCol:`t{4:i}`nSource:`t{5}"
-                    , err.message = "Syntax error" ? "" : err.message
-                    , err.url, err.line, err.column, err.source),, "IconX"
+                if ErrorStdOut
+                    ErrorStdOut.WriteLine(Format("{1} ({2:i}) : ==> {3}`n     Specifically: {4}"
+                        , err.url, err.line, err.message, err.source))
+                else
+                    MsgBox Format("Syntax error: {1}`n`nFile:`t{2}`nLine:`t{3:i}`nCol:`t{4:i}`nSource:`t{5}"
+                        , err.message = "Syntax error" ? "" : err.message
+                        , err.url, err.line, err.column, err.source),, "IconX"
+                if loading_script
+                    ExitApp 2
             } else {
                 ; Runtime errors have stack, which includes the error name and message.
                 MsgBox err.stack,, "IconX"
