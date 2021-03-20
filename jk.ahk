@@ -470,13 +470,17 @@ SingleInstance(mode:='force') {
 
 Include(path) {
     static already_included := (_ => (_.CaseSense := 'Off', _))(Map())
+    included := 0
     Loop Files path, 'F' {
         path := A_LoopFileFullPath
         if already_included.Has(path)
             continue
         already_included[path] := true
         JsRT.RunFile path, default_script_encoding
+        ++included
     }
+    if !included && !(path ~= '[*?]')
+        throw Error('Include file "' path '" cannot be opened.')
 }
 
 
