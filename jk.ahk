@@ -122,8 +122,8 @@ AddAhkObjects(scope) {
     }
     
     ; **** REPLACEMENTS FOR DIRECTIVES ***
-    scope.singleInstance := WrapBif(SingleInstance)
-    scope.include := WrapBif(Include)
+    for fn in [SingleInstance, Include, Persistent]
+        scope.%AdjustFuncName(fn.Name)% := WrapBif(fn)
 }
 
 
@@ -477,6 +477,11 @@ Include(path) {
         already_included[path] := true
         JsRT.RunFile path, default_script_encoding
     }
+}
+
+
+Persistent() {
+    OnMessage(0xBADC0DE, (*) => "")
 }
 
 
