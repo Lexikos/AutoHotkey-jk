@@ -33,7 +33,7 @@ define_vars() {
 	FileEncoding: rw,
 	Hour: r,
 	IconFile: r,
-	IconHidden: rw,
+	IconHidden: {get: GetIconHidden, set: SetIconHidden},
 	IconNumber: r,
 	IconTip: rw,
 	InitialWorkingDir: A_InitialWorkingDir,

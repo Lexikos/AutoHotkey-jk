@@ -8,14 +8,10 @@ functions_use_lowercase_initial_letter := true
 #include GetCommandLineArgs.ahk
 #include <D>
 
+#NoTrayIcon
 #SingleInstance Off
 OnError ErrorMsg
 RemoveAhkMenus
-
-; Avoid briefly showing the icon when A_IconHidden=true is present.
-; FIXME: prevent the timer from overriding JS use of A_IconHidden.
-; #NoTrayIcon
-; SetTimer () => A_IconHidden := false, -50
 
 ; Process command line
 ParseCommandLine
@@ -79,10 +75,15 @@ AddAhkObjects js
 ; Debug
 IsSet(&D) ? js.D := WrapBif(D) : %'D'% := _ => ""
 
-loading_script := true   ; ExitApp if a SyntaxError is encountered while loading.
+loading_script := true    ; ExitApp if a SyntaxError is encountered while loading.
+StartupIconTimer true
+
+; Parse and execute the main script file.
 JsRT.RunFile J_ScriptFullPath, default_script_encoding
-loading_script := false  ; Consider the loading phase complete.
-ErrorStdOut := false     ; Use it only while loading.
+
+ErrorStdOut := false      ; Use it only while loading.
+loading_script := false   ; Consider the loading phase complete.
+StartupIconTimer          ; In case it hasn't run yet, fire and delete the timer to allow the script to exit if non-persistent.
 
 
 AddAhkObjects(scope) {
@@ -476,6 +477,25 @@ Include(path) {
         already_included[path] := true
         JsRT.RunFile path, default_script_encoding
     }
+}
+
+
+StartupIconTimer(enable := unset) {
+    ; This timer is used to prevent the icon from appearing momentarily
+    ; for scripts which use A_IconHidden within 100ms of starting.
+    if !IsSet(&enable) {
+        if !IconTimerIsSet ; Timer already fired or script has set A_IconHidden.
+            return
+        A_IconHidden := false
+        enable := false
+    }
+    global IconTimerIsSet := enable
+    SetTimer StartupIconTimer, enable ? -100 : 0
+}
+GetIconHidden() => A_IconHidden && !IconTimerIsSet
+SetIconHidden(value) {
+    A_IconHidden := value
+    StartupIconTimer false
 }
 
 
