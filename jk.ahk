@@ -20,7 +20,6 @@ RemoveAhkMenus
 ; Process command line
 ParseCommandLine
 ParseCommandLine() {
-    global jkfile := ""
     global default_script_encoding := "UTF-8"
     global J_Args := GetCommandLineArgs() ; Get all, including those processed by AutoHotkey.
     global is_restart := false
@@ -54,13 +53,14 @@ ParseCommandLine() {
         MsgBox "Script file not found.",, "IconX"
         ExitApp
     }
+    global J_ScriptFullPath := jkfile
 }
 
-WinSetTitle jktitle := jkfile ' - AutoHotkey v' JKVersion, A_ScriptHwnd
+WinSetTitle jktitle := J_ScriptFullPath ' - AutoHotkey v' JKVersion, A_ScriptHwnd
 if is_restart
     TerminatePreviousInstance 'Reload'
-SplitPath jkfile, &A_ScriptName
-A_IconTip := A_ScriptName
+SplitPath J_ScriptFullPath, &J_ScriptName, &J_ScriptDir
+A_IconTip := A_ScriptName := J_ScriptName
 
 ; Helpers
 undefined := ComObject(0,0), null := ComObject(9,0)
@@ -75,12 +75,10 @@ js := JsRT.Edge()
 
 AddAhkObjects js
 
+; Debug
+IsSet(&D) ? js.D := WrapBif(D) : %'D'% := _ => ""
 
-js.A_Args := js.Array(J_Args*)
-
-IsSet(&D) ? js.D := WrapBif(D) : %'D'% := (*) => 0
-
-JsRT.RunFile jkfile, default_script_encoding
+JsRT.RunFile J_ScriptFullPath, default_script_encoding
 
 
 AddAhkObjects(scope) {
@@ -104,7 +102,10 @@ AddAhkObjects(scope) {
         scope.%cls.Prototype.__class% := WrapClass(cls)
     
     ; **** VARIABLES ****
+    GetLineFile   := js.Function('return          /\((.+?:.+?):(\d+):\d+\)/.exec(Error().stack)[1];')
+    GetLineNumber := js.Function('return parseInt(/\((.+?:.+?):(\d+):\d+\)/.exec(Error().stack)[2]);')
     #include vars.ahk
+    defProp scope, 'A_Args', {value: js.Array(J_Args*), writable: true}
     variables.TrayMenu := WrapObject(A_TrayMenu)
     get_var(name)        => %name%
     set_var(name, value) => %name% := value
@@ -116,7 +117,8 @@ AddAhkObjects(scope) {
     }
     
     ; **** REPLACEMENTS FOR DIRECTIVES ***
-    js.singleInstance := WrapBif(SingleInstance)
+    scope.singleInstance := WrapBif(SingleInstance)
+    scope.include := WrapBif(Include)
 }
 
 
@@ -147,7 +149,7 @@ CallFromJS(callee, isCtor, argv, argc, state) {
             throw TypeError(fn.Name ' is not a constructor')
         if JsRT.JsGetValueType(NumGet(argv, "ptr")) = 0 ; this === undefined
             argv += A_PtrSize, argc -= 1 ; Don't pass this as a parameter.
-        args := ConvertArgv(argv, argc)
+        args := ArrayFromArgv(argv, argc)
         if HasProp(fn, 'belongsTo') && not HasBase(args[1], fn.belongsTo)
             throw TypeError("'this' is not a " fn.belongsTo.__Class) ; More authentic than the default error.
         return ToJs(fn(args*))
@@ -165,7 +167,7 @@ CallClassFromJS(callee, isCtor, argv, argc, state) {
             throw TypeError(cls.Prototype.__Class ' cannot be called without the new keyword')
         if !JsRT.JsInstanceOf(this, callee)
             throw TypeError("'this' is not a " cls.Prototype.__Class)
-        realthis := cls(ConvertArgv(argv + A_PtrSize, argc - 1)*)
+        realthis := cls(ArrayFromArgv(argv + A_PtrSize, argc - 1)*)
         JsRT.FromJs(this).__ahk := realthis
         return this
     } catch e {
@@ -255,7 +257,7 @@ SetIterator(jobj, f) {
 }
 
 
-ConvertArgv(argv, argc) {
+ArrayFromArgv(argv, argc) {
     loop (args := []).Length := argc {
         v := NumGet(argv + (A_Index-1)*A_PtrSize, "ptr")
         switch JsRT.JsGetValueType(v) {
@@ -424,21 +426,22 @@ RemoveAhkMenus() {
     }
 }
 
+
 Edit() {
-    SplitPath jkfile, &fn
-    if WinExist(fn,, WinGetTitle(A_ScriptHwnd))
+    if WinExist(J_ScriptName,, WinGetTitle(A_ScriptHwnd))
         return WinActivate()
     try
-        Run '*edit "' jkfile '"'
+        Run '*edit "' J_ScriptFullPath '"'
     catch
-        Run 'notepad.exe "' jkfile '"'
+        Run 'notepad.exe "' J_ScriptFullPath '"'
 }
 
+
 Reload() {
-    ; FIXME: new instance might close wrong old instance if multiple jk files are running
     Run Format(A_IsCompiled ? '"{2}" /restart "{3}"' : '"{1}" "{2}" /restart "{3}"'
-        , A_AhkPath, A_ScriptFullPath, jkfile), A_InitialWorkingDir
+        , A_AhkPath, A_ScriptFullPath, J_ScriptFullPath), A_InitialWorkingDir
 }
+
 
 SingleInstance(mode:='force') {
     switch StrLower(mode) {
@@ -450,6 +453,18 @@ SingleInstance(mode:='force') {
                     ExitApp
         default:
             throw ValueError('Invalid mode "' mode '"')
+    }
+}
+
+
+Include(path) {
+    static already_included := (_ => (_.CaseSense := 'Off', _))(Map())
+    Loop Files path, 'F' {
+        path := A_LoopFileFullPath
+        if already_included.Has(path)
+            continue
+        already_included[path] := true
+        JsRT.RunFile path, default_script_encoding
     }
 }
 
