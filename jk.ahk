@@ -104,7 +104,6 @@ AddAhkObjects(scope) {
         fn_name := AdjustFuncName(fn_name)
         scope.%fn_name% := WrapBif(fn)
     }
-    scope.%AdjustFuncName('CollectGarbage')% := WrapBif(JsRT.JsCollectGarbage.Bind(JsRT, JsRT._runtime))
     
     ; **** CLASSES ****
     Gui.Prototype.Control := Gui.Prototype.GetOwnPropDesc('__Item').get
@@ -129,6 +128,13 @@ AddAhkObjects(scope) {
     ; **** REPLACEMENTS FOR DIRECTIVES ***
     for fn in [Include, InstallKeybdHook, InstallMouseHook, Persistent, SingleInstance]
         scope.%AdjustFuncName(fn.Name)% := WrapBif(fn)
+    
+    ; **** REPLACEMENTS FOR LOOPS ***
+    scope.%AdjustFuncName('LoopFiles')% := WrapBif(_LoopFiles)
+    scope.%AdjustFuncName('LoopReg')% := WrapBif(_LoopReg)
+    
+    ; **** Additional Functions ***
+    scope.%AdjustFuncName('CollectGarbage')% := WrapBif(JsRT.JsCollectGarbage.Bind(JsRT, JsRT._runtime))
 }
 
 
@@ -184,6 +190,25 @@ CallClassFromJS(callee, isCtor, argv, argc, state) {
         JsRT.JsSetException ErrorToJs(e)
         return 0
     }
+}
+
+
+; This ensures correct conversion of parameters and thrown exceptions
+; (which would otherwise mostly come out as error 0x80020101).
+CallIntoJS(callee, args) {
+    return JsRT.FromJs(JsRT.JsCallFunction(callee, ArrayToArgv(args), args.Length))
+}
+
+
+ArrayToArgv(args) {
+    b := BufferAlloc(args.Length * A_PtrSize, 0)
+    for arg in args {
+        if IsSet(&arg)
+            NumPut 'ptr', ToJs(arg), b, (A_Index-1)*A_PtrSize
+        else
+            NumPut 'ptr', JsRT.JsGetUndefinedValue(), b, (A_Index-1)*A_PtrSize
+    }
+    return b
 }
 
 
@@ -332,14 +357,15 @@ ToJs(v) {
 ErrorToJs(e) {
     if not e is Error
         return JsRT.ToJs(e)
+    D e.message '`n' e.stack
     if e is TypeError
-        return JsRT.JsCreateTypeError(JsRT.ToJs(StrReplace(e.message, "a ComO", "an o")))
+        return JsRT.ToJS(js.TypeError(StrReplace(e.message, "a ComO", "an o")))
     if e is MemberError && RegExMatch(e.message, 'named "(.*?)"', &m)
-        return JsRT.JsCreateTypeError(JsRT.ToJs("Object doesn't support property or method '" m.1 "'"))
+        return JsRT.ToJS(js.TypeError("Object doesn't support property or method '" m.1 "'"))
     ; FIXME: add Error functions to script for instanceof, and set prototype
-    je := JsRT.JsCreateError(JsRT.ToJs(e.message))
-    JsRT.FromJs(je).name := type(e)
-    return je
+    je := js.Error(e.message)
+    je.name := type(e)
+    return JsRT.ToJs(je)
 }
 
 
@@ -374,8 +400,8 @@ class JsCachingProxy {
         return super(rj)
     }
     __New(rj) {
-        this.__j := JsRT.FromJs(rj)
         this.__rj := rj
+        JsRT.JsAddRef(rj)
         ; If a function is passed to SetTimer, OnMessage, etc. twice, it needs to
         ; be the same proxy object both times.  Built-in COM support would just
         ; create a new ComObject wrapper, which wouldn't allow an existing timer
@@ -383,20 +409,28 @@ class JsCachingProxy {
         ; The naive approach is to create a ComObject once and store it in the JS
         ; object; but that creates a circular reference and prevents the objects
         ; from ever being deleted.  Instead, store an uncounted reference.
-        ExternalProperty rj, '__p', ObjPtr(this)
+        ExternalProperty(rj, '__p', ObjPtr(this))
     }
     __Delete() {
+        if err := JsRT.JsHasException()  ; Various Js APIs fail if in exception state, which seems to be not unusual when __delete is called.
+            err := JsRT.JsGetAndClearException(), JsRT.JsAddRef(err)
         ; If the proxy is deleted, that means the program hasn't kept a reference
         ; to it, so it's okay for any future calls to pass a new proxy object.
-        ; __p must be cleared because the JS object might still be referenced by
-        ; the script (if it's not, this.__j was keeping it alive).
-        ExternalProperty this.__rj, '__p', 0
+        ; __p must be cleared because the JS object might be passed back to us.
+        ExternalProperty(this.__rj, '__p', 0)
+        JsRT.JsRelease(this.__rj)
+        if err
+            JsRT.JsSetException(err), JsRT.JsRelease(err)
     }
 }
 
 
 class JsFunctionProxy extends JsCachingProxy {
-    Call(params*) => (this.__j)(params*)
+    Call(params*) {
+        static missing := (_ => (_.Length := 1, _))([])
+        params.InsertAt(1, missing*)
+        return CallIntoJS(this.__rj, params)
+    }
     MinParams => 0
     MaxParams => 0
     IsVariadic => true
@@ -605,6 +639,31 @@ GetIconHidden() => A_IconHidden && !IconTimerIsSet
 SetIconHidden(value) {
     A_IconHidden := value
     StartupIconTimer false
+}
+
+
+_LoopFiles(pattern, mode, body:=unset) {
+    IsSet(&body) || (body := mode, mode := 'F')
+    static fields := ['attrib', 'dir', 'ext', 'fullPath', 'name', 'path', 'shortName'
+        , 'shortPath', 'size', 'timeAccessed', 'timeCreated', 'timeModified']
+    Loop Files pattern, mode {
+        item := js.Object()
+        for field in fields
+            item.%field% := A_LoopFile%field%
+        body(item)
+    }
+}
+
+
+_LoopReg(keyname, mode, body:=unset) {
+    IsSet(&body) || (body := mode, mode := 'F')
+    static fields := ['name', 'type', 'key', 'timeModified']
+    Loop Reg keyname, mode {
+        item := js.Object()
+        for field in fields
+            item.%field% := A_LoopReg%field%
+        body(item)
+    }
 }
 
 
