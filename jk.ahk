@@ -58,6 +58,7 @@ if is_restart
     TerminatePreviousInstance 'Reload'
 SplitPath J_ScriptFullPath, &J_ScriptName, &J_ScriptDir
 A_IconTip := A_ScriptName := J_ScriptName
+SetWorkingDir J_ScriptDir
 
 ; Helpers
 undefined := ComObject(0,0), null := ComObject(9,0)
