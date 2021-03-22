@@ -7,7 +7,7 @@ define_vars() {
   return {
     AhkPath: A_ScriptFullPath,
     AhkVersion: JKVersion,
-	AllowMainWindow: rw,
+	AllowMainWindow: r,
 	AppData: r,
 	AppDataCommon: r,
 	Clipboard: rw,

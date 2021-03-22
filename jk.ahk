@@ -1,4 +1,9 @@
 ﻿JKVersion := '3.0-alpha.1'
+;@Ahk2Exe-SetName AutoHotkey (jk)
+;@Ahk2Exe-SetVersion %A_PriorLine~.*'(.*)'~$1%
+;@Ahk2Exe-SetDescription AutoHotkey (jk)
+;@Ahk2Exe-SetCopyright Copyright (c) 2021
+;@Ahk2Exe-Bin %A_ScriptDir%\bin\AutoHotkeySC.bin, AutoHotkey.exe
 
 ; Configuration
 functions_use_lowercase_initial_letter := true
@@ -6,11 +11,15 @@ functions_use_lowercase_initial_letter := true
 ; Required libraries
 #include ..\ActiveScript\JsRT.ahk
 #include GetCommandLineArgs.ahk
+;@Ahk2Exe-IgnoreBegin
 #include <D>
+;@Ahk2Exe-IgnoreEnd
+
 
 #NoTrayIcon
 #SingleInstance Off
 OnError ErrorMsg
+A_AllowMainWindow := true
 RemoveAhkMenus
 
 ; Process command line
@@ -22,7 +31,7 @@ ParseCommandLine() {
     global ErrorStdOut := false
     drop_jk_ahk := !A_IsCompiled
     J_Args.RemoveAt 1 ; Drop the exe.
-    loop {
+    while J_Args.Length {
         if J_Args[1] ~= 'i)^/r(?:estart)$'
             is_restart := true
         else if J_Args[1] ~= 'i)^/cp\d+$'
@@ -36,7 +45,7 @@ ParseCommandLine() {
         else
             break
         J_Args.RemoveAt 1
-    } until J_Args.Length = 0
+    }
     jkfile_found := false
     Loop Files J_Args.Length ? (jkfile := J_Args.RemoveAt(1)) : "test.jk" {
         jkfile := A_LoopFileFullPath
@@ -539,9 +548,7 @@ RemoveAhkMenus() {
                 case 65407: (A_IsCompiled) || ListVars()
                 case 65400, 65303: Reload
                 case 65401, 65304: Edit
-                case 65300: ; Open
-                    if A_AllowMainWindow
-                        WinShow A_ScriptHwnd
+                case 65300: WinShow A_ScriptHwnd ; Open
                 default: goto default_action ; Allow all others
             }
             return 0
