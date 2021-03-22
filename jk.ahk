@@ -75,6 +75,7 @@ jsTrue := ComObject(0xB, -1), jsFalse := ComObject(0xB, 0)
 AdjustFuncName := functions_use_lowercase_initial_letter
     ? n => RegExReplace(n, '^[A-Z]+', '$l0') : n => n
 AdjustPropName := AdjustFuncName
+AdjustMethodName := AdjustFuncName
 AdjustClassName := n => n
 
 ; Initialize script engine
@@ -256,7 +257,7 @@ WrapMethods(aobj, jobj) {
         if pd.HasProp('value') {
             if pd.value is Func {
                 pd.value := WrapBif(pd.value)
-                p := AdjustFuncName(p)
+                p := AdjustMethodName(p)
             }
             else if pd.value is Class {
                 pd.value := WrapClass(pd.value)
@@ -267,7 +268,7 @@ WrapMethods(aobj, jobj) {
         }
         else if pd.HasProp('call') {
             pd := {value: WrapBif(pd.call)}
-            p := AdjustFuncName(p)
+            p := AdjustMethodName(p)
         }
         else {
             if pd.HasProp('get')
