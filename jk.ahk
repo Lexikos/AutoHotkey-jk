@@ -20,7 +20,7 @@ functions_use_lowercase_initial_letter := true
 #SingleInstance Off
 OnError ErrorMsg
 A_AllowMainWindow := true
-RemoveAhkMenus
+PatchMenus
 
 ; Process command line
 ParseCommandLine
@@ -125,7 +125,9 @@ AddAhkObjects(scope) {
     GetLineNumber := js.Function('return parseInt(/\((.+?:.+?):(\d+):\d+\)/.exec(Error().stack)[2]);')
     #include vars.ahk
     defProp scope, 'A_Args', {value: js.Array(J_Args*), writable: true}
-    variables.TrayMenu := JsRT.FromJs(ObjectToJs(A_TrayMenu))
+    variables.TrayMenu := JsRT.FromJs(ObjectToJs(J_TrayMenu))
+    defProp variables.TrayMenu, AdjustMethodName('Show'), {value: WrapBif(TrayMenu_Show_Fix)}
+    variables.TrayMenu.test := 42
     get_var(name)        => %name%
     set_var(name, value) => %name% := value
     for name, value in variables.OwnProps() {
@@ -534,28 +536,64 @@ ErrorMsg(err, mode) {
 }
 
 
-RemoveAhkMenus() {
+PatchMenus() {
     hmenu := DllCall("GetMenu", "ptr", A_ScriptHwnd)
     DllCall("RemoveMenu", "ptr", hmenu, "uint", 65406, "uint", 0)
     DllCall("RemoveMenu", "ptr", hmenu, "uint", 65407, "uint", 0)
     
-    static newproc := CallbackCreate(WindowProc, "F", 4)
+    A_TrayMenu.Delete
+    global J_TrayMenu := Menu()
+    global Menu_AddStandard := Menu.Prototype.AddStandard
+    Menu.Prototype.DefineProp 'AddStandard', {Call: Menu_AddStandard_Fix}
+    Menu_AddStandard_Fix J_TrayMenu
+    
+    MsgCommand(wParam, lParam, nmsg, hwnd) {
+        switch wParam & 0xFFFF {
+            case 65406: (A_IsCompiled) || ListLines() ; Allow for debug when not compiled.
+            case 65407: (A_IsCompiled) || ListVars()
+            case 65400, 65303: Reload
+            case 65401, 65304: Edit
+            case 65403, 65306: Pause -1
+            case 65300: ; Open
+                WinShow A_ScriptHwnd
+                WinActivate A_ScriptHwnd
+            default: return ; Allow all others
+        }
+        return 0
+    }
+    
+    MsgNotifyIcon(wParam, lParam, nmsg, hwnd) {
+        activate_default_tray_item() {
+            global J_TrayMenu
+            if -1 != default_id := DllCall("GetMenuDefaultItem", "ptr", J_TrayMenu.handle, "uint", false, "uint", 1)
+                PostMessage(0x111, default_id,, A_ScriptHwnd)
+        }
+        switch lParam {
+            case 0x205: ; WM_RBUTTONUP
+                TrayMenu_Show_Fix J_TrayMenu, true
+            case 0x201: ; WM_LBUTTONDOWN
+                if J_TrayMenu.ClickCount = 1
+                    activate_default_tray_item
+            case 0x203: ; WM_LBUTTONDBLCLK
+                activate_default_tray_item
+        }
+        return 0
+    }
+    
+    ; OnMessage 0x111, MsgCommand
+    ; OnMessage 1028, MsgNotifyIcon
+    static newproc := CallbackCreate(WindowProc, "", 4) ; Not using "Fast" due to issues with tray menu & A_IsPaused.
     static oldproc := DllCall("SetWindowLong" (A_PtrSize=8 ? "PtrW" : "W")
         , "ptr", A_ScriptHwnd, "int", -4, "ptr", newproc, "ptr")
     WindowProc(hwnd, nmsg, wParam, lParam) {
+        Critical
         if (nmsg = 0x111 && (wParam & 0xFFFF) >= 65300) {
-            switch wParam & 0xFFFF {
-                case 65406: (A_IsCompiled) || ListLines() ; Allow for debug when not compiled.
-                case 65407: (A_IsCompiled) || ListVars()
-                case 65400, 65303: Reload
-                case 65401, 65304: Edit
-                case 65300: WinShow A_ScriptHwnd ; Open
-                default: goto default_action ; Allow all others
-            }
-            return 0
+            if "" != r := MsgCommand(wParam, lParam, nmsg, hwnd)
+                return r
         }
-        default_action:
-        return DllCall("CallWindowProc", "ptr", oldproc, "ptr", hwnd, "uint", nmsg, "ptr", wParam, "ptr", lParam)
+        else if (nmsg = 1028) ; AHK_NOTIFYICON
+            return MsgNotifyIcon(wParam, lParam, nmsg, hwnd)
+        return DllCall("CallWindowProc", "ptr", oldproc, "ptr", hwnd, "uint", nmsg, "ptr", wParam, "ptr", lParam, "ptr")
     }
 }
 
@@ -697,4 +735,101 @@ TerminateInstance(hwnd, by) {
         if MsgBox("Could not close the previous instance of this script.  Keep waiting?",, "y/n") = "no"
             ExitApp 2
     }
+}
+
+
+Menu_AddStandard_Fix(m) {
+    item_count() => DllCall('GetMenuItemCount', 'ptr', m.handle)
+    id_exists(id) => DllCall('GetMenuState', 'ptr', m.handle, 'uint', id, 'uint', 0) != -1
+    name_exists(name) {
+        try {
+            m.Rename name, name
+            return true
+        }
+        return false
+    }
+    /* ; This is disabled for consistency and to facilitate testing.
+    if !A_IsCompiled {
+        ; Don't need as much complication.
+        adding_open := !id_exists(65300)
+        Menu_AddStandard(m)
+        if !m.Default && adding_open && m = J_TrayMenu
+            m.Default := "&Open"
+        return
+    }*/
+    CMD(id) => (*) => PostMessage(0x111, id, 0, A_ScriptHwnd)
+    static group := [
+        [["&Open", CMD(65300)],
+         ["&Help", CMD(65301)]],
+        [["&Window Spy", CMD(65302)],
+         ["&Reload This Script", CMD(65303)],
+         ["&Edit This Script", CMD(65304)]],
+        [["&Suspend Hotkeys", CMD(65305)],
+         ["&Pause Script", CMD(65306)],
+         ["E&xit", CMD(65307)]]
+    ]
+    ; Determine what's about to be added based on what exists.
+    ; Normally the standard items have unique IDs, and those are used to determine
+    ; whether to add each item.  That means a renamed standard item will still appear
+    ; standard, while changing the callback changes the ID and therefore marks it as
+    ; custom.  One drawback of that approach is that customizing an action and then
+    ; calling AddStandard will add back the standard item with the same text.
+    ; Another reason we don't try to use/preserve the standard IDs here is that it
+    ; would be possible only for some of the items when this script is compiled,
+    ; which complicates things and creates inconsistency.
+    number_to_add(items) {
+        n := 0
+        for item in items
+            if !name_exists(item[1])
+                ++n
+        return n
+    }
+    index := item_count() + 1
+    adding1 := number_to_add(group[1]) > 1
+    adding2 := number_to_add(group[2]) > 1
+    adding3 := number_to_add(group[3]) > 1
+    ; Determine whether to add separators based on which items are being added.
+    ; Normally the standard separators have unique IDs, and are added only if not
+    ; already present in the menu.  This doesn't try to replicate that exactly,
+    ; but instead tries to separate the groups as they are normally.
+    add_sep := [adding1 && (adding2 || adding3), adding2 && adding3, false]
+    first_added := ""
+    add_if_needed(name, action) {
+        if !name_exists(name) {
+            m.Add name, action
+            if first_added = ""
+                first_added := name
+        }
+    }
+    ; Add the items.
+    for items in group {
+        for item in items
+            if !name_exists(item[1])
+                add_if_needed(item*)
+        if add_sep[A_Index]
+            m.Add
+    }
+    if m = J_TrayMenu && !m.Default && first_added = "&Open"
+        m.Default := index '&'
+}
+
+
+TrayMenu_Show_Fix(m, postCmd:=false) { ; Fixes pause check mark (broken by window subclassing).
+    if m = J_TrayMenu {
+        try m.%A_IsPaused?"Check":"Uncheck"%("&Pause Script")
+        try m.%A_IsSuspended?"Check":"Uncheck"%("&Suspend Hotkeys")
+    }
+    DllCall("GetCursorPos", "ptr", pt := BufferAlloc(8))
+    x := NumGet(pt, 0, "int"), y := NumGet(pt, 4, "int")
+    ; TPM_NONOTIFY := 0x80, TPM_RETURNCMD := 0x100, flags := TPM_NONOTIFY | TPM_RETURNCMD
+    flags := postCmd ? 0x180 : 0
+    GFW() => DllCall("GetForegroundWindow", "ptr")
+    active_wnd := GFW()
+    WinActivate A_ScriptHwnd
+    id := DllCall("TrackPopupMenuEx", "ptr", m.handle, "uint", flags, "int", x, "int", y, "ptr", A_ScriptHwnd, "ptr", 0)
+    if GFW() = A_ScriptHwnd
+        WinActivate active_wnd
+    if postCmd && id
+        PostMessage 0x111, id,, A_ScriptHwnd
+    ; return (Menu.Prototype.Show)(m)
 }
