@@ -31,7 +31,7 @@ InputBox !InStr !IsAlnum !IsAlpha !IsDigit !IsFloat !IsInteger !IsLabel !IsLower
 ListHotkeys !ListLines !ListVars ListViewGetContent !Ln LoadPicture !Log !LTrim !Max
 MenuFromHandle MenuSelect !Min !Mod MonitorGet MonitorGetCount MonitorGetName
 MonitorGetPrimary MonitorGetWorkArea MouseClick MouseClickDrag MouseGetPos
-MouseMove MsgBox NumGet NumPut ObjAddRef !ObjBindMethod !ObjFromPtr
+MouseMove MsgBox NumGet NumPut !ObjAddRef !ObjBindMethod !ObjFromPtr
 !ObjFromPtrAddRef !ObjGetBase !ObjGetCapacity !ObjHasOwnProp !ObjOwnPropCount
 !ObjOwnProps !ObjPtr !ObjPtrAddRef !ObjRelease !ObjSetBase !ObjSetCapacity
 OnClipboardChange OnError OnExit OnMessage !Ord OutputDebug Pause PixelGetColor
