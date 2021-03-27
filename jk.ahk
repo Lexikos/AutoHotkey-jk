@@ -621,16 +621,30 @@ Reload() {
 
 
 SingleInstance(mode:='force') {
+    dhw := A_DetectHiddenWindows
     switch StrLower(mode) {
         case 'force':
             TerminatePreviousInstance 'SingleInstance'
         case 'ignore':
+            A_DetectHiddenWindows := true
             for hwnd in WinGetList(jktitle " ahk_class AutoHotkey")
                 if hwnd != A_ScriptHwnd
                     ExitApp
+        case 'prompt':
+            prompted := false
+            A_DetectHiddenWindows := true
+            for hwnd in WinGetList(jktitle " ahk_class AutoHotkey") {
+                if hwnd != A_ScriptHwnd {
+                    if prompted || MsgBox("An older instance of this script is already running.  Replace it with this instance?",, "y/n") = "no"
+                        ExitApp
+                    prompted := true
+                    TerminateInstance hwnd, 'SingleInstance'
+                }
+            }
         default:
             throw ValueError('Invalid mode "' mode '"')
     }
+    A_DetectHiddenWindows := dhw
 }
 
 
