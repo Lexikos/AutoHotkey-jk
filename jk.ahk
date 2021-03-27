@@ -584,8 +584,7 @@ PatchMenus() {
     ; OnMessage 0x111, MsgCommand
     ; OnMessage 1028, MsgNotifyIcon
     static newproc := CallbackCreate(WindowProc, "", 4) ; Not using "Fast" due to issues with tray menu & A_IsPaused.
-    static oldproc := DllCall("SetWindowLong" (A_PtrSize=8 ? "PtrW" : "W")
-        , "ptr", A_ScriptHwnd, "int", -4, "ptr", newproc, "ptr")
+    static oldproc := DllCall((A_PtrSize=8 ? "SetWindowLongPtrW" : "SetWindowLongW"), "ptr", A_ScriptHwnd, "int", -4, "ptr", newproc, "ptr")
     WindowProc(hwnd, nmsg, wParam, lParam) {
         if (nmsg = 0x111 && (wParam & 0xFFFF) >= 65300) {
             if "" != r := MsgCommand(wParam, lParam, nmsg, hwnd)
