@@ -600,8 +600,11 @@ PatchMenus() {
 
 
 Edit() {
-    if WinExist(J_ScriptName,, WinGetTitle(A_ScriptHwnd))
-        return WinActivate()
+    for hwnd in WinGetList(J_ScriptName) {
+        if WinGetClass(hwnd) ~= '^(#32770|AutoHotkey)$'
+            continue
+        return WinActivate(hwnd)
+    }
     try
         Run '*edit "' J_ScriptFullPath '"'
     catch
