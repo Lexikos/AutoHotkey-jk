@@ -586,13 +586,14 @@ PatchMenus() {
     static oldproc := DllCall("SetWindowLong" (A_PtrSize=8 ? "PtrW" : "W")
         , "ptr", A_ScriptHwnd, "int", -4, "ptr", newproc, "ptr")
     WindowProc(hwnd, nmsg, wParam, lParam) {
-        Critical
         if (nmsg = 0x111 && (wParam & 0xFFFF) >= 65300) {
             if "" != r := MsgCommand(wParam, lParam, nmsg, hwnd)
                 return r
         }
         else if (nmsg = 1028) ; AHK_NOTIFYICON
             return MsgNotifyIcon(wParam, lParam, nmsg, hwnd)
+        ; Mark this thread as immediately interruptible in case this message is one that should launch a new thread.
+        Critical 0 ; Without this, hotkey, menu and clipboard threads cannot launch while a dialog is being displayed.
         return DllCall("CallWindowProc", "ptr", oldproc, "ptr", hwnd, "uint", nmsg, "ptr", wParam, "ptr", lParam, "ptr")
     }
 }
