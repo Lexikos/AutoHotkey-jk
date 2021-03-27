@@ -128,9 +128,12 @@ AddAhkObjects(scope) {
     GetLineNumber := js.Function('return parseInt(/\((.+?:.+?):(\d+):\d+\)/.exec(Error().stack)[2]);')
     #include vars.ahk
     defProp scope, 'A_Args', {value: js.Array(J_Args*), writable: true}
+    variables.Clipboard := {
+        get: () => A_Clipboard,
+        set: (value) => A_Clipboard := IsObject(value) ? ObjectFromJs(JsRT.ToJs(value)) : value
+    }
     variables.TrayMenu := JsRT.FromJs(ObjectToJs(J_TrayMenu))
     defProp variables.TrayMenu, AdjustMethodName('Show'), {value: WrapBif(TrayMenu_Show_Fix)}
-    variables.TrayMenu.test := 42
     get_var(name)        => %name%
     set_var(name, value) => %name% := value
     for name, value in variables.OwnProps() {
