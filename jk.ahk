@@ -5,6 +5,8 @@
 ;@Ahk2Exe-SetCopyright Copyright (c) 2021
 ;@Ahk2Exe-Bin %A_ScriptDir%\bin\AutoHotkeySC.bin, AutoHotkey.exe
 
+#Requires AutoHotkey v2.0-a128+
+
 ; Configuration
 functions_use_lowercase_initial_letter := true
 allow_wildcard_in_include := false
