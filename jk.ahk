@@ -7,6 +7,7 @@
 
 ; Configuration
 functions_use_lowercase_initial_letter := true
+allow_wildcard_in_include := false
 
 ; Required libraries
 #include ..\ActiveScript\JsRT.ahk
@@ -633,6 +634,8 @@ SingleInstance(mode:='force') {
 
 
 Include(path) {
+    if !allow_wildcard_in_include && path ~= '[*?<>"]'  ; <>" are undocumented wildcard characters.
+        throw Error('Include file "' path '" cannot be opened.')
     static already_included := (_ => (_.CaseSense := 'Off', _))(Map())
     included := 0
     Loop Files path, 'F' {
@@ -645,6 +648,8 @@ Include(path) {
     }
     if !included && !(path ~= '[*?]')
         throw Error('Include file "' path '" cannot be opened.')
+    if allow_wildcard_in_include
+        return included
 }
 
 
