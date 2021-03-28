@@ -107,6 +107,7 @@ AddAhkObjects(scope) {
     defProp := scope.Object.defineProperty
     
     ; **** FUNCTIONS ****
+    Hotkey := _Hotkey ; Define this locally so it will be used below.
     #include funcs.ahk ; -> functions, callback_params, output_params, output_params_return
     Loop Parse functions, ' ' {
         if A_LoopField ~= '\W'  ; Disabled function
@@ -117,6 +118,7 @@ AddAhkObjects(scope) {
         fn_name := AdjustFuncName(fn_name)
         scope.%fn_name% := WrapBif(fn)
     }
+    AddHotkeySettings(scope)
     
     ; **** CLASSES ****
     Gui.Prototype.Control := Gui.Prototype.GetOwnPropDesc('__Item').get
@@ -737,6 +739,53 @@ _LoopReg(keyname, mode, body:=unset) {
             item.%field% := A_LoopReg%field%
         body(item)
     }
+}
+
+
+AddHotkeySettings(scope) {
+    hk := scope.hotkey, defProp := js.Object.defineProperty
+    _Hotkey.B := '', _Hotkey.T := '', _Hotkey.I := '', _Hotkey.useHook := false
+    defProp hk, AdjustPropName('MaxThreadsBuffer'), {
+        get: ()      => _Hotkey.B ? jsTrue : jsFalse,
+        set: (value) => _Hotkey.B := value ? 'B' : ''
+    }
+    defProp hk, AdjustPropName('MaxThreadsPerHotkey'), {
+        get: ()      => _Hotkey.T ? Integer(SubStr(_Hotkey.T, 2)) : 1,
+        set: (value) => _Hotkey.T := (value := intInRange(value, 1, 255)) != 1 ? 'T' value : ''
+    }
+    defProp hk, AdjustPropName('InputLevel'), {
+        get: ()      => _Hotkey.I ? Integer(SubStr(_Hotkey.I, 2)) : 0,
+        set: (value) => _Hotkey.I := (value := intInRange(value, 0, 100)) ? 'I' value : ''
+    }
+    defProp hk, AdjustPropName('UseHook'), {
+        get: ()      => _Hotkey.useHook ? jsTrue : jsFalse,
+        set: (value) => _Hotkey.useHook := value ? true : false
+    }
+    intInRange(i, low, high) {
+        if (i := Integer(i)) < low || i > high
+            throw ValueError("Invalid value")
+        return i
+    }
+}
+
+_Hotkey(keyname, callback:="", options:="") {
+    try
+        Hotkey keyname
+    catch e {
+        if not e is TargetError
+            throw e
+        ; This is a new hotkey, so insert the default options.
+        options := _Hotkey.B  _Hotkey.T  _Hotkey.I  options
+        ; Create the hotkey (this will throw if callback = On/Off/Toggle).
+        Hotkey keyname, callback, options
+        ; If useHook, apply $ after creating the hotkey so its "name" is not affected.
+        if _Hotkey.useHook
+            Hotkey '$' keyname
+        return
+    }
+    ; Above didn't throw, so the hotkey already exists.
+    if (callback != "" || options != "")
+        Hotkey keyname, callback, options
 }
 
 
