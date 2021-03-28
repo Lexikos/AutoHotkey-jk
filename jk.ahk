@@ -174,11 +174,10 @@ WrapBif(fn) {
         fn := ((r, fn, p*) => r(fn(p*))).Bind(op_return, fn)
     }
     static callbackFromJS := CallbackCreate(CallFromJS, "F")
-    ; Since this is only used with built-in functions, we don't need to
-    ; worry about the fact that the reference to fn will never be released
-    ; (since there's no finalizer for rfn).
-    ; FIXME: we're now used with BoundFunc, which should be released at some point.
-    return JsRT.FromJs(JsRT.JsCreateFunction(callbackFromJS, ObjPtrAddRef(fn)))
+    static callbackBeforeCollect := CallbackCreate((rfn, pfn) => ObjRelease(pfn), "F")
+    rfn := JsRT.JsCreateFunction(callbackFromJS, pfn := ObjPtrAddRef(fn))
+    JsRT.JsSetObjectBeforeCollectCallback(rfn, pfn, callbackBeforeCollect)
+    return JsRT.FromJs(rfn)
 }
 
 
