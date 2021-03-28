@@ -108,6 +108,7 @@ AddAhkObjects(scope) {
     
     ; **** FUNCTIONS ****
     Hotkey := _Hotkey ; Define this locally so it will be used below.
+    Boolean(r) => r ? jsTrue : jsFalse
     #include funcs.ahk ; -> functions, callback_params, output_params, output_params_return
     Loop Parse functions, ' ' {
         if A_LoopField ~= '\W'  ; Disabled function
@@ -159,15 +160,18 @@ AddAhkObjects(scope) {
 
 
 WrapBif(fn) {
-    ; Does fn need special handling for OutputVars?
+    ; Does fn need special handling?
+    op_return := fn.DeleteProp('returns')
     if op_array := fn.DeleteProp('output') {
-        op_return := fn.DeleteProp('returns')
         op := Map()
         loop op_array.length
             if op_array.Has(A_Index)
                 op[A_Index] := op_array[A_Index]
         op.in_count := fn.MaxParams - op.count
         fn := BifCallReturnOutputVars.Bind(fn, op, op_return)
+    }
+    else if op_return {
+        fn := ((r, fn, p*) => r(fn(p*))).Bind(op_return, fn)
     }
     static callbackFromJS := CallbackCreate(CallFromJS, "F")
     ; Since this is only used with built-in functions, we don't need to

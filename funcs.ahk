@@ -88,3 +88,14 @@ LoadPicture.returns := (r, o) => (o.handle := r, o)
 PixelSearch.returns := (r, o) => (r ? o : jsFalse)
 Run.returns := (r, o) => o.pid
 RunWait.returns := (r, o) => (o.exitCode := r, o)
+
+ControlGetChecked.returns := Boolean
+ControlGetEnabled.returns := Boolean
+ControlGetVisible.returns := Boolean
+KeyWait.returns := Boolean
+SoundGetMute.returns := Boolean
+StatusBarWait.returns := Boolean
+WinWait.returns := Boolean
+WinWaitActive.returns := Boolean
+WinWaitClose.returns := Boolean
+WinWaitNotActive.returns := Boolean
