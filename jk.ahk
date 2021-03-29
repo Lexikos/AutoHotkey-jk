@@ -125,6 +125,8 @@ AddAhkObjects(scope) {
     Gui.Prototype.Control := Gui.Prototype.GetOwnPropDesc('__Item').get
     for cls in [ClipboardAll, File, Gui, InputHook, Menu, MenuBar]
         scope.%cls.Prototype.__class% := WrapClass(cls)
+    for cls in [MemoryError, OSError, TargetError, TimeoutError]
+        scope.%cls.Prototype.__class% := WrapErrorClass(cls)
     
     ; **** VARIABLES ****
     GetLineFile   := js.Function('return          /\((.+?:.+?):(\d+):\d+\)/.exec(Error().stack)[1];')
@@ -236,7 +238,6 @@ ArrayToArgv(args) {
 
 
 WrapClass(acls) {
-    static jsClassFor := Map()
     if ObjHasOwnProp(acls, '__js')
         return acls.__js
     static callbackFromJS := CallbackCreate(CallClassFromJS, "F")
@@ -251,6 +252,13 @@ WrapClass(acls) {
     }
     static setTag := js.Function('obj', 'tag', 'obj[Symbol.toStringTag] = tag')
     setTag jcls.prototype, acls.Prototype.__Class
+    return jcls
+}
+
+
+WrapErrorClass(acls) {
+    jcls := JsRT.Eval(Format('{ class {1} extends Error {}; {1}.prototype.name = "{1}"; {1} }', acls.Prototype.__class))
+    acls.Prototype.__js := jcls.prototype
     return jcls
 }
 
@@ -385,9 +393,10 @@ ErrorToJs(e) {
         return JsRT.ToJS(js.TypeError(StrReplace(e.message, "a ComO", "an o")))
     if e is MemberError && RegExMatch(e.message, 'named "(.*?)"', &m)
         return JsRT.ToJS(js.TypeError("Object doesn't support property or method '" m.1 "'"))
-    ; FIXME: add Error functions to script for instanceof, and set prototype
     je := js.Error(e.message)
-    je.name := type(e)
+    je.extra := e.Extra
+    if (b := ObjGetBase(e)).HasProp('__js')
+        je.__proto__ := b.__js
     return JsRT.ToJs(je)
 }
 
