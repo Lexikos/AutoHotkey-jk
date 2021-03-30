@@ -149,6 +149,17 @@ AddAhkObjects(scope) {
     }
     
     ; **** REPLACEMENTS FOR DIRECTIVES ***
+    Persistent(n:=true) {
+        global Persistent
+        static isPersistent
+        if IsSet(&Persistent) && Persistent is Func
+            wasPersistent := Persistent(n) ; v2.0-a130+
+        else {
+            wasPersistent := isPersistent
+            OnMessage(0xBADC0DE, (*) => "", isPersistent := n) ; v2.0-a129 and older
+        }
+        return wasPersistent ? jsTrue : jsFalse
+    }
     for fn in [Include, InstallKeybdHook, InstallMouseHook, Persistent, SingleInstance]
         scope.%AdjustFuncName(fn.Name)% := WrapBif(fn)
     
@@ -682,11 +693,6 @@ Include(path) {
         throw Error('Include file "' path '" cannot be opened.')
     if allow_wildcard_in_include
         return included
-}
-
-
-Persistent() {
-    OnMessage(0xBADC0DE, (*) => "")
 }
 
 
