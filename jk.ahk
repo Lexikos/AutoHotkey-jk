@@ -17,7 +17,7 @@ allow_wildcard_in_include := false
 #include ..\ActiveScript\JsRT.ahk
 #include GetCommandLineArgs.ahk
 ;@Ahk2Exe-IgnoreBegin
-#include <D>
+#include *i <D>
 ;@Ahk2Exe-IgnoreEnd
 
 
