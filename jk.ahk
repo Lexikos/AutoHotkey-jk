@@ -197,9 +197,10 @@ WrapBif(fn) {
 
 
 CallFromJS(callee, isCtor, argv, argc, state) {
+    argc &= 0xffff, isCtor &= 0xff ; Ignore possible garbage due to types smaller than pointer.
     try {
         fn := ObjFromPtrAddRef(state)
-        if isCtor & 0xff
+        if isCtor
             throw TypeError(fn.Name ' is not a constructor')
         if JsRT.JsGetValueType(NumGet(argv, "ptr")) = 0 ; this === undefined
             argv += A_PtrSize, argc -= 1 ; Don't pass this as a parameter.
@@ -215,9 +216,10 @@ CallFromJS(callee, isCtor, argv, argc, state) {
 
 
 CallClassFromJS(callee, isCtor, argv, argc, state) {
+    argc &= 0xffff, isCtor &= 0xff ; Ignore possible garbage due to types smaller than pointer.
     try {
         this := NumGet(argv, "ptr"), cls := ObjFromPtrAddRef(state)
-        if !(isCtor & 0xff)
+        if !isCtor
             throw TypeError(cls.Prototype.__Class ' cannot be called without the new keyword')
         if !JsRT.JsInstanceOf(this, callee)
             throw TypeError("'this' is not a " cls.Prototype.__Class)
