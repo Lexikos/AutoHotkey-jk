@@ -12,12 +12,14 @@
 ; Configuration
 functions_use_lowercase_initial_letter := true
 allow_wildcard_in_include := false
+default_script_name := RegExReplace(A_ScriptName, '\.[^\.]*$', '.j?')
 
 ; Required libraries
 #include ..\ActiveScript\JsRT.ahk
 #include GetCommandLineArgs.ahk
 ;@Ahk2Exe-IgnoreBegin
 #include *i <D>
+default_script_name := "test.jk"
 ;@Ahk2Exe-IgnoreEnd
 
 
@@ -51,16 +53,24 @@ ParseCommandLine() {
             break
         J_Args.RemoveAt 1
     }
-    jkfile_found := false
-    Loop Files J_Args.Length ? (jkfile := J_Args.RemoveAt(1)) : "test.jk" {
-        jkfile := A_LoopFileFullPath
-        jkfile_found := true
+    if !J_Args.Length {
+        for prefix in ['', A_MyDocuments '\'] {
+            Loop Files prefix default_script_name {
+                jkfile := A_LoopFileFullPath
+                break 2
+            }
+        }
+        if !IsSet(&jkfile) {
+            jkfile := FileSelect("1", default_script_name, "Select Script File", "Script Files (*.jk;*.js)")
+            if jkfile = ""
+                ExitApp
+        }
     }
-    if jkfile = "" {
-        MsgBox 'A script file must be specified on the command line or by drag-dropping it onto the program file. The program will now exit.',, 'Iconi'
-        ExitApp
+    else if !(J_Args[1] ~= '[*?<>"]') {
+        Loop Files J_Args.RemoveAt(1)
+            jkfile := A_LoopFileFullPath
     }
-    if !jkfile_found {
+    if !IsSet(&jkfile) {
         MsgBox "Script file not found.",, "IconX"
         ExitApp
     }
