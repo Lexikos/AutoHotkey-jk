@@ -403,7 +403,9 @@ ToJs(v) {
 ErrorToJs(e) {
     if not e is Error
         return JsRT.ToJs(e)
+    ;@Ahk2Exe-IgnoreBegin
     D e.message '`n' e.stack
+    ;@Ahk2Exe-IgnoreEnd
     if e is TypeError
         return JsRT.ToJS(js.TypeError(StrReplace(e.message, "a ComO", "an o")))
     if e is MemberError && RegExMatch(e.message, 'named "(.*?)"', &m)
