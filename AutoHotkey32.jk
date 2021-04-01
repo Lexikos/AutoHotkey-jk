@@ -1,0 +1,36 @@
+'use strict';
+
+const fileTypeKey = 'AutoHotkeyJK';
+const fileExtension = '.jk';
+const rootKey = 'HKCU\\Software\\Classes\\'; // Current user only; no admin needed.
+
+let install = false;
+try {
+    regRead(rootKey + fileTypeKey);
+} catch (e) {
+    install = true;
+}
+if (msgBox(install ? 'Register ' + fileExtension + ' files to run AutoHotkey?'
+    : 'Delete ' + fileExtension + ' file type registration?', undefined, 'y/n') == 'No')
+    exitApp();
+const values = [
+    {key: '', value: 'AutoHotkey JavaScript File'},
+    {key: '\\DefaultIcon', value: A_AhkPath + ',1'},
+    {key: '\\Shell', value: 'Open'},
+    {key: '\\Shell\\Open', value: 'Run Script'},
+    {key: '\\Shell\\Open\\Command', value: `"${A_AhkPath}" "%1" %*`},
+    {key: '\\Shell\\Edit', value: 'Edit Script'},
+    {key: '\\Shell\\Edit\\Command', value: 'notepad "%1" %*'},
+];
+if (install) {
+    for (let v of values)
+        regWrite(v.value, 'REG_SZ', rootKey + fileTypeKey + v.key);
+    regWrite(fileTypeKey, 'REG_SZ', rootKey + fileExtension);
+}
+else {
+    regDeleteKey(rootKey + fileTypeKey);
+    regDeleteKey(rootKey + fileExtension);
+}
+
+const SHCNE_ASSOCCHANGED = 0x08000000;
+dllCall("shell32\\SHChangeNotify", "uint", SHCNE_ASSOCCHANGED, "uint", 0, "int", 0, "int", 0);
