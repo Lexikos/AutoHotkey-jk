@@ -16,7 +16,7 @@ default_script_name := RegExReplace(A_ScriptName, '\.[^\.]*$', '.j?')
 
 ; Required libraries
 #include <JsRT>
-#include GetCommandLineArgs.ahk
+#include <GetCommandLineArgs>
 ;@Ahk2Exe-IgnoreBegin
 #include *i <D>
 default_script_name := "test.jk"
