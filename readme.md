@@ -39,6 +39,9 @@ AutoHotkeyU32.exe jk.ahk
 
 When compiled, it is sufficient to double-click on the executable file or drag-drop a JavaScript file onto it.
 
+[AutoHotkey32.jk](AutoHotkey32.jk) can be used to register the .jk filename extension (or an extension of your choice after editing it into the script) for the current user. Once registered, double-clicking a .jk file will execute it. Either run AutoHotkey32.exe or drag-drop AutoHotkey32.jk onto AutoHotkey64.exe, depending on which one you want to associate script files with. Run the script again to deregister the .jk extension.
+
+
 ### Parameters
 
 The following standard parameters are recognized: `/r`, `/restart`, `/cp` (with number suffix), `/ErrorStdOut` (with optional `=` value), `/Debug` (with optional `=` value).
