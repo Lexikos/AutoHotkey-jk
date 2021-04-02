@@ -15,7 +15,7 @@ allow_wildcard_in_include := false
 default_script_name := RegExReplace(A_ScriptName, '\.[^\.]*$', '.j?')
 
 ; Required libraries
-#include ..\ActiveScript\JsRT.ahk
+#include <JsRT>
 #include GetCommandLineArgs.ahk
 ;@Ahk2Exe-IgnoreBegin
 #include *i <D>
