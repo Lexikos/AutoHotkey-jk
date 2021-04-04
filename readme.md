@@ -90,6 +90,8 @@ dllCall and comCall are available and mostly unchanged, but may be unsafe with r
 
 All built-in variables should be available except for the following: `A_IsCritical`, `A_Index`, `A_Loop`..., `A_Space`, `A_Tab`, `A_ThisFunc`
 
+`A_HotkeyInterval`, `A_MaxHotkeysPerInterval` and `A_HotkeyModifierTimeout` are fully supported with v2.0-a130. For prior versions, they are given the usual default values (2000, 70, 50), but cannot be set.
+
 ### Classes
 
 These classes are available: `ClipboardAll`, `File`, `Gui`, `InputHook`, `Menu`, `MenuBar`. Classes must be instantiated the normal JavaScript way; by using the `new` keyword.
@@ -124,9 +126,9 @@ Evaluates the file in global scope, at run time. There is no `*i` option, but tr
 ```
 installKeybdHook();
 installMouseHook();
-persistent();
+persistent(persist);
 ```
-Direct replacements for the corresponding directives.
+Direct replacements for the corresponding directives prior to v2.0-a130 (which replaces the directives with functions). The `persist` parameter is supported prior to v2.0-a130, while `installKeybdHook` and `installMouseHook` support parameters only with v2.0-a130.
 
 ```
 singleInstance(mode);
@@ -138,8 +140,9 @@ hotkey.inputLevel
 hotkey.maxThreadsBuffer
 hotkey.maxThreadsPerHotkey
 hotkey.useHook
+hotkey.suspendExempt
 ```
-These properties directly replace the corresponding directives; of course, being properties and not directives, their values can be retrieved or changed at runtime. As before, these settings only affect the default options for newly created hotkey variants.
+These properties directly replace the corresponding directives; of course, being properties and not directives, their values can be retrieved or changed at runtime. As before, these settings only affect the default options for newly created hotkey variants.  `suspendExempt` requires AutoHotkey v2.0-a130, and has no effect on earlier versions.
 
 ```
 A_IconHidden = false;
