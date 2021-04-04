@@ -88,7 +88,7 @@ SetWorkingDir J_ScriptDir
 undefined := ComObject(0,0), null := ComObject(9,0)
 jsTrue := ComObject(0xB, -1), jsFalse := ComObject(0xB, 0)
 AdjustFuncName := functions_use_lowercase_initial_letter
-    ? n => RegExReplace(n, '^[A-Z]+', '$l0') : n => n
+    ? n => RegExReplace(n, '^_?([A-Z]+)', '$l1') : n => n
 AdjustPropName := AdjustFuncName
 AdjustMethodName := AdjustFuncName
 AdjustClassName := n => n
@@ -117,6 +117,13 @@ StartupIconTimer          ; In case it hasn't run yet, fire and delete the timer
 
 AddAhkObjects(scope) {
     defProp := scope.Object.defineProperty
+    polyfill(name) {
+        global
+        try
+            return IsSet(&%name%) ? %name% : _%name%
+        catch
+            return _%name%
+    }
     
     ; **** FUNCTIONS ****
     Hotkey := _Hotkey ; Define this locally so it will be used below.
@@ -161,17 +168,9 @@ AddAhkObjects(scope) {
     }
     
     ; **** REPLACEMENTS FOR DIRECTIVES ***
-    Persistent(n:=true) {
-        global Persistent
-        static isPersistent
-        if IsSet(&Persistent) && Persistent is Func
-            wasPersistent := Persistent(n) ; v2.0-a130+
-        else {
-            wasPersistent := isPersistent
-            OnMessage(0xBADC0DE, (*) => "", isPersistent := n) ; v2.0-a129 and older
-        }
-        return wasPersistent ? jsTrue : jsFalse
-    }
+    InstallKeybdHook := polyfill('InstallKeybdHook')
+    InstallMouseHook := polyfill('InstallMouseHook')
+    Persistent := polyfill('Persistent')
     for fn in [Include, InstallKeybdHook, InstallMouseHook, Persistent, SingleInstance]
         scope.%AdjustFuncName(fn.Name)% := WrapBif(fn)
     
@@ -712,7 +711,16 @@ Include(path) {
 }
 
 
-InstallKeybdHook() {
+
+_Persistent(n:=true) {  ; For v2.0-a129 and older only.
+    static isPersistent := false
+    wasPersistent := isPersistent
+    OnMessage(0xBADC0DE, (*) => "", isPersistent := n ? 1 : 0)
+    return wasPersistent ? jsTrue : jsFalse
+}
+
+
+_InstallKeybdHook() {
     static ih
     if IsSet(&ih)
         return
@@ -721,7 +729,7 @@ InstallKeybdHook() {
 }
 
 
-InstallMouseHook() {
+_InstallMouseHook() {
     ; If a custom combination uses the same key as both prefix and suffix,
     ; it will never execute.  Even if it did, it would have no effect and
     ; is unlikely to conflict with an existing hotkey for obvious reasons.
