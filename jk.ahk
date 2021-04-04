@@ -786,7 +786,7 @@ _LoopReg(keyname, mode, body:=unset) {
 
 AddHotkeySettings(scope) {
     hk := scope.hotkey, defProp := js.Object.defineProperty
-    _Hotkey.B := '', _Hotkey.T := '', _Hotkey.I := '', _Hotkey.useHook := false
+    _Hotkey.B := _Hotkey.T := _Hotkey.I := _Hotkey.S := '', _Hotkey.useHook := false
     defProp hk, AdjustPropName('MaxThreadsBuffer'), {
         get: ()      => _Hotkey.B ? jsTrue : jsFalse,
         set: (value) => _Hotkey.B := value ? 'B' : ''
@@ -803,6 +803,10 @@ AddHotkeySettings(scope) {
         get: ()      => _Hotkey.useHook ? jsTrue : jsFalse,
         set: (value) => _Hotkey.useHook := value ? true : false
     }
+    defProp hk, AdjustPropName('SuspendExempt'), {  ; v2.0-a130+
+        get: ()      => _Hotkey.S ? jsTrue : jsFalse,
+        set: (value) => _Hotkey.S := value ? 'S' : ''
+    }
     intInRange(i, low, high) {
         if (i := Integer(i)) < low || i > high
             throw ValueError("Invalid value")
@@ -817,7 +821,7 @@ _Hotkey(keyname, callback:="", options:="") {
         if not e is TargetError
             throw e
         ; This is a new hotkey, so insert the default options.
-        options := _Hotkey.B  _Hotkey.T  _Hotkey.I  options
+        options := _Hotkey.B  _Hotkey.T  _Hotkey.I  _Hotkey.S  options
         ; Create the hotkey (this will throw if callback = On/Off/Toggle).
         Hotkey keyname, callback, options
         ; If useHook, apply $ after creating the hotkey so its "name" is not affected.
