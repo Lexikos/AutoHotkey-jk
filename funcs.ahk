@@ -4,7 +4,7 @@ functions := "
 (Join`s
 !Abs !ACos !ASin !ATan BlockInput !Buffer CallbackCreate CallbackFree
 CaretGetPos !Ceil !Chr Click ClipWait ComCall ComObjActive ComObjArray
-ComObjConnect ComObjCreate ComObject ComObjFlags ComObjGet ComObjQuery
+ComObjConnect ComObjCreate ComObject ComValue ComObjFlags ComObjGet ComObjQuery
 ComObjType ComObjValue ControlAddItem ControlChooseIndex ControlChooseString
 ControlClick ControlDeleteItem ControlFindItem ControlFocus ControlGetChecked
 ControlGetChoice ControlGetClassNN ControlGetEnabled ControlGetExStyle
