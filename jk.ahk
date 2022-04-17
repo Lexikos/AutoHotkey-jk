@@ -60,7 +60,7 @@ ParseCommandLine() {
                 break 2
             }
         }
-        if !IsSet(&jkfile) {
+        if !IsSetRef(&jkfile) {
             jkfile := FileSelect("1", default_script_name, "Select Script File", "Script Files (*.jk;*.js)")
             if jkfile = ""
                 ExitApp
@@ -70,7 +70,7 @@ ParseCommandLine() {
         Loop Files J_Args.RemoveAt(1)
             jkfile := A_LoopFileFullPath
     }
-    if !IsSet(&jkfile) {
+    if !IsSetRef(&jkfile) {
         MsgBox "Script file not found.",, "IconX"
         ExitApp
     }
@@ -102,7 +102,7 @@ MAX_SAFE_INTEGER := js.Number.MAX_SAFE_INTEGER
 AddAhkObjects js
 
 ; Debug
-IsSet(&D) ? js.D := WrapBif(D) : %'D'% := _ => ""
+IsSetRef(&D) ? js.D := WrapBif(D) : %'D'% := _ => ""
 
 loading_script := true    ; ExitApp if a SyntaxError is encountered while loading.
 StartupIconTimer true
@@ -120,7 +120,7 @@ AddAhkObjects(scope) {
     polyfill(name) {
         global
         try
-            return IsSet(&%name%) ? %name% : _%name%
+            return IsSetRef(&%name%) ? %name% : _%name%
         catch
             return _%name%
     }
@@ -252,7 +252,7 @@ CallIntoJS(callee, args) {
 ArrayToArgv(args) {
     b := BufferAlloc(args.Length * A_PtrSize, 0)
     for arg in args {
-        if IsSet(&arg)
+        if IsSetRef(&arg)
             NumPut 'ptr', ToJs(arg), b, (A_Index-1)*A_PtrSize
         else
             NumPut 'ptr', JsRT.JsGetUndefinedValue(), b, (A_Index-1)*A_PtrSize
@@ -438,12 +438,12 @@ ExternalProperty(rv, name, ptr:=unset) {
     id := JsRT.JsGetPropertyIdFromName(name)
     rx := JsRT.JsGetProperty(rv, id)
     if JsRT.JsGetValueType(rx) = 0 { ; JsUndefined
-        if !IsSet(&ptr) || !ptr
+        if !IsSetRef(&ptr) || !ptr
             return 0
         rx := JsRT.JsCreateExternalObject(ptr, 0)
         JsRT.JsSetProperty(rv, id, rx, true)
     }
-    else if IsSet(&ptr)
+    else if IsSetRef(&ptr)
         JsRT.JsSetExternalData(rx, ptr)
     else
         ptr := JsRT.JsGetExternalData(rx)
@@ -722,7 +722,7 @@ _Persistent(n:=true) {  ; For v2.0-a129 and older only.
 
 _InstallKeybdHook() {
     static ih
-    if IsSet(&ih)
+    if IsSetRef(&ih)
         return
     ih := InputHook('I255 L0 B V')
     ih.Start
@@ -743,7 +743,7 @@ _InstallMouseHook() {
 StartupIconTimer(enable := unset) {
     ; This timer is used to prevent the icon from appearing momentarily
     ; for scripts which use A_IconHidden within 100ms of starting.
-    if !IsSet(&enable) {
+    if !IsSetRef(&enable) {
         if !IconTimerIsSet ; Timer already fired or script has set A_IconHidden.
             return
         A_IconHidden := false
@@ -760,7 +760,7 @@ SetIconHidden(value) {
 
 
 _LoopFiles(pattern, mode, body:=unset) {
-    IsSet(&body) || (body := mode, mode := 'F')
+    IsSetRef(&body) || (body := mode, mode := 'F')
     static fields := ['attrib', 'dir', 'ext', 'fullPath', 'name', 'path', 'shortName'
         , 'shortPath', 'size', 'timeAccessed', 'timeCreated', 'timeModified']
     Loop Files pattern, mode {
@@ -773,7 +773,7 @@ _LoopFiles(pattern, mode, body:=unset) {
 
 
 _LoopReg(keyname, mode, body:=unset) {
-    IsSet(&body) || (body := mode, mode := 'F')
+    IsSetRef(&body) || (body := mode, mode := 'F')
     static fields := ['name', 'type', 'key', 'timeModified']
     Loop Reg keyname, mode {
         item := js.Object()
