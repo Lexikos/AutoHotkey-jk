@@ -153,14 +153,14 @@ class JsRT
     
     static FromJs(valref)
     {
-        ref := ComObject(0x400C, (var := BufferAlloc(24, 0)).ptr)
+        ref := ComValue(0x400C, (var := Buffer(24, 0)).ptr)
         this.JsValueToVariant(valref, var)
         return (val := ref[], ref[] := 0, val)
     }
     
     static ToJs(val)
     {
-        ref := ComObject(0x400C, (var := BufferAlloc(24, 0)).ptr)
+        ref := ComValue(0x400C, (var := Buffer(24, 0)).ptr)
         ref[] := val
         valref := this.JsVariantToValue(var)
         ref[] := 0

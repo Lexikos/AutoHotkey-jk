@@ -32,19 +32,19 @@ define_vars() {
 	EventInfo: rw,
 	FileEncoding: rw,
 	Hour: r,
-	HotkeyInterval: IsSet(&A_HotkeyInterval) ? rw : 2000, ; Can only be changed from the default on v2.0-a130+
-	HotkeyModifierTimeout: IsSet(&A_HotkeyModifierTimeout) ? rw : 50, ; Can only be changed from the default on v2.0-a130+
+	HotkeyInterval: IsSetRef(&A_HotkeyInterval) ? rw : 2000, ; Can only be changed from the default on v2.0-a130+
+	HotkeyModifierTimeout: IsSetRef(&A_HotkeyModifierTimeout) ? rw : 50, ; Can only be changed from the default on v2.0-a130+
 	IconFile: r,
 	IconHidden: {get: GetIconHidden, set: SetIconHidden},
 	IconNumber: r,
 	IconTip: rw,
 	InitialWorkingDir: A_InitialWorkingDir,
-	Is64bitOS: ComObject(0xB, -A_Is64bitOS),
-	IsAdmin: ComObject(0xB, -A_IsAdmin),
-    IsCompiled: ComObject(0xB, 0),
+	Is64bitOS: ComValue(0xB, -A_Is64bitOS),
+	IsAdmin: ComValue(0xB, -A_IsAdmin),
+    IsCompiled: ComValue(0xB, 0),
 	; IsCritical: r,
-    IsPaused: {get: () => ComObject(0xB, -A_IsPaused)},
-    IsSuspended: {get: () => ComObject(0xB, -A_IsSuspended)},
+    IsPaused: {get: () => ComValue(0xB, -A_IsPaused)},
+    IsSuspended: {get: () => ComValue(0xB, -A_IsSuspended)},
 	KeyDelay: rw,
 	KeyDelayPlay: rw,
 	KeyDuration: rw,
@@ -74,9 +74,9 @@ define_vars() {
 	; LoopRegName: r,
 	; LoopRegTimeModified: r,
 	; LoopRegType: r,
-	MaxHotkeysPerInterval: IsSet(&A_MaxHotkeysPerInterval) ? rw : 70, ; Can only be changed from the default on v2.0-a130+
+	MaxHotkeysPerInterval: IsSetRef(&A_MaxHotkeysPerInterval) ? rw : 70, ; Can only be changed from the default on v2.0-a130+
 	MDay: r,
-	MenuMaskKey: IsSet(&A_MenuMaskKey) ? rw : 'vk11sc01D', ; Can only be changed from the default on v2.0-a130+
+	MenuMaskKey: IsSetRef(&A_MenuMaskKey) ? rw : 'vk11sc01D', ; Can only be changed from the default on v2.0-a130+
 	Min: r,
 	MM: r,
 	MMM: r,
