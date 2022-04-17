@@ -250,7 +250,7 @@ CallIntoJS(callee, args) {
 
 
 ArrayToArgv(args) {
-    b := BufferAlloc(args.Length * A_PtrSize, 0)
+    b := Buffer(args.Length * A_PtrSize, 0)
     for arg in args {
         if IsSetRef(&arg)
             NumPut 'ptr', ToJs(arg), b, (A_Index-1)*A_PtrSize
@@ -941,7 +941,7 @@ TrayMenu_Show_Fix(m, postCmd:=false) { ; Fixes pause check mark (broken by windo
         try m.%A_IsPaused?"Check":"Uncheck"%("&Pause Script")
         try m.%A_IsSuspended?"Check":"Uncheck"%("&Suspend Hotkeys")
     }
-    DllCall("GetCursorPos", "ptr", pt := BufferAlloc(8))
+    DllCall("GetCursorPos", "ptr", pt := Buffer(8))
     x := NumGet(pt, 0, "int"), y := NumGet(pt, 4, "int")
     ; TPM_NONOTIFY := 0x80, TPM_RETURNCMD := 0x100, flags := TPM_NONOTIFY | TPM_RETURNCMD
     flags := postCmd ? 0x180 : 0

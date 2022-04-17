@@ -2,7 +2,7 @@
 ; Functions with a non-word char prefix are disabled.
 functions := "
 (Join`s
-!Abs !ACos !ASin !ATan BlockInput !BufferAlloc CallbackCreate CallbackFree
+!Abs !ACos !ASin !ATan BlockInput !Buffer CallbackCreate CallbackFree
 CaretGetPos !Ceil !Chr Click ClipWait ComCall ComObjActive ComObjArray
 ComObjConnect ComObjCreate ComObject ComObjFlags ComObjGet ComObjQuery
 ComObjType ComObjValue ControlAddItem ControlChooseIndex ControlChooseString
