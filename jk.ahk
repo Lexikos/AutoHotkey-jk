@@ -85,8 +85,8 @@ A_IconTip := A_ScriptName := J_ScriptName
 SetWorkingDir J_ScriptDir
 
 ; Helpers
-undefined := ComObject(0,0), null := ComObject(9,0)
-jsTrue := ComObject(0xB, -1), jsFalse := ComObject(0xB, 0)
+undefined := ComValue(0,0), null := ComValue(9,0)
+jsTrue := ComValue(0xB, -1), jsFalse := ComValue(0xB, 0)
 AdjustFuncName := functions_use_lowercase_initial_letter
     ? n => RegExReplace(n, '^_?([A-Z]+)', '$l1') : n => n
 AdjustPropName := AdjustFuncName
