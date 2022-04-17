@@ -217,7 +217,7 @@ CallFromJS(callee, isCtor, argv, argc, state) {
         if HasProp(fn, 'belongsTo') && not HasBase(args[1], fn.belongsTo)
             throw TypeError("'this' is not a " fn.belongsTo.__Class) ; More authentic than the default error.
         return ToJs(fn(args*))
-    } catch e {
+    } catch as e {
         JsRT.JsSetException ErrorToJs(e)
         return 0
     }
@@ -233,7 +233,7 @@ CallClassFromJS(callee, isCtor, argv, argc, state) {
         if !JsRT.JsInstanceOf(this, callee)
             throw TypeError("'this' is not a " cls.Prototype.__Class)
         return ObjectToJs(cls(ArrayFromArgv(argv + A_PtrSize, argc - 1)*))
-    } catch e {
+    } catch as e {
         if e is ValueError && cls.Call = Object.Call
             e := TypeError(cls.Prototype.__Class " cannot be instantiated directly")
         JsRT.JsSetException ErrorToJs(e)
@@ -817,7 +817,7 @@ AddHotkeySettings(scope) {
 _Hotkey(keyname, callback:="", options:="") {
     try
         Hotkey keyname
-    catch e {
+    catch as e {
         if not e is TargetError
             throw e
         ; This is a new hotkey, so insert the default options.
