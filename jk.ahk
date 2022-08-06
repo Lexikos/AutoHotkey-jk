@@ -39,7 +39,7 @@ ParseCommandLine() {
     drop_jk_ahk := !A_IsCompiled
     J_Args.RemoveAt 1 ; Drop the exe.
     while J_Args.Length {
-        if J_Args[1] ~= 'i)^/r(?:estart)$'
+        if J_Args[1] = '/restart'
             is_restart := true
         else if J_Args[1] ~= 'i)^/cp\d+$'
             default_script_encoding := SubStr(J_Args[1], 2)
