@@ -44,11 +44,11 @@ When compiled, it is sufficient to double-click on the executable file or drag-d
 
 ### Parameters
 
-The following standard parameters are recognized: `/r`, `/restart`, `/cp` (with number suffix), `/ErrorStdOut` (with optional `=` value), `/Debug` (with optional `=` value).
+The following standard parameters are recognized: `/restart`, `/cp` (with number suffix), `/ErrorStdOut` (with optional `=` value), `/Debug` (with optional `=` value).
 
 When the script is compiled, or if any of these *precede* the `jk.ahk` parameter, they are also recognized by the real AutoHotkey. However, due to the way jk is designed, only `/Debug` should have an effect (and that one is ignored by jk).
 
-The following standard parameters are **not** recognized: `/f`, `/force`, `/validate`, `/iLib`.
+The following standard parameters are **not** recognized: `/force`, `/validate`, `/iLib`.
 
 The first unrecognized parameter is assumed to be the path of a JavaScript file. Any subsequent parameters are included in `A_Args`.
 
