@@ -10,19 +10,16 @@ Requirements:
 
 Compilation is optional, but recommended when not debugging jk itself, as it makes the program behave a little more like the real AutoHotkey.
 
-The following are expected to exist relative to the script's directory:
-  - `bin32\AutoHotkey.exe`: Used with Ahk2Exe below.
-  - `bin32\AutoHotkeySC.bin`: Provides the base binary for `AutoHotkey32.exe`.
-  - `bin64\AutoHotkeySC.bin`: Provides the base binary for `AutoHotkey64.exe`.
+If the script is compiled with default options, the following are expected to exist relative to the compiler directory:
+  - `..\v2\AutoHotkey32.exe`
+  - `..\v2\AutoHotkey64.exe`
 
-If the binaries come from an AutoHotkey v2 zip download, they must be renamed appropriately. It is set up this way because `bin32` and `bin64` on the author's system are symbolic links to the output directories used to build AutoHotkey v2, in order to compile the script from cutting-edge builds rather than an official release.
+In that case, the script is compiled twice, with the output files being named AutoHotkey32.exe and AutoHotkey64.exe.
 
-A command line like the following may be used to compile the script:
+Alternatively, a command line like the following may be used to compile the script (specifying paths as needed):
 ```
-Ahk2Exe.exe /ahk bin64\AutoHotkey.exe /in jk.ahk
+Ahk2Exe.exe /base AutoHotkey64.exe /in jk.ahk
 ```
-
-If the Ahk2Exe GUI is used, the AutoHotkey executable Ahk2Exe uses must be for v2 alpha as indicated in the requirements above. Using the `/ahk` switch allows the use of the standard Ahk2Exe included with AutoHotkey v1.1.
 
 ## Running Scripts
 

@@ -4,8 +4,8 @@
 ;@Ahk2Exe-SetVersion %A_PriorLine~.*'(.*)'~$1%
 ;@Ahk2Exe-SetDescription AutoHotkey %U_bits%-bit (jk)
 ;@Ahk2Exe-SetCopyright Copyright (c) 2021
-;@Ahk2Exe-Bin %A_ScriptDir%\bin32\AutoHotkeySC.bin, AutoHotkey32.exe
-;@Ahk2Exe-Bin %A_ScriptDir%\bin64\AutoHotkeySC.bin, AutoHotkey64.exe
+;@Ahk2Exe-Bin ..\v2\AutoHotkey32.exe, AutoHotkey32.exe
+;@Ahk2Exe-Bin ..\v2\AutoHotkey64.exe, AutoHotkey64.exe
 
 #Requires AutoHotkey v2.0-beta.6
 
