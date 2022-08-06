@@ -117,13 +117,6 @@ StartupIconTimer          ; In case it hasn't run yet, fire and delete the timer
 
 AddAhkObjects(scope) {
     defProp := scope.Object.defineProperty
-    polyfill(name) {
-        global
-        try
-            return IsSetRef(&%name%) ? %name% : _%name%
-        catch
-            return _%name%
-    }
     
     ; **** FUNCTIONS ****
     Hotkey := _Hotkey ; Define this locally so it will be used below.
@@ -168,9 +161,6 @@ AddAhkObjects(scope) {
     }
     
     ; **** REPLACEMENTS FOR DIRECTIVES ***
-    InstallKeybdHook := polyfill('InstallKeybdHook')
-    InstallMouseHook := polyfill('InstallMouseHook')
-    Persistent := polyfill('Persistent')
     for fn in [Include, InstallKeybdHook, InstallMouseHook, Persistent, SingleInstance]
         scope.%AdjustFuncName(fn.Name)% := WrapBif(fn)
     
@@ -708,35 +698,6 @@ Include(path) {
         throw Error('Include file "' path '" cannot be opened.')
     if allow_wildcard_in_include
         return included
-}
-
-
-
-_Persistent(n:=true) {  ; For v2.0-a129 and older only.
-    static isPersistent := false
-    wasPersistent := isPersistent
-    OnMessage(0xBADC0DE, (*) => "", isPersistent := n ? 1 : 0)
-    return wasPersistent ? jsTrue : jsFalse
-}
-
-
-_InstallKeybdHook() {
-    static ih
-    if IsSetRef(&ih)
-        return
-    ih := InputHook('I255 L0 B V')
-    ih.Start
-}
-
-
-_InstallMouseHook() {
-    ; If a custom combination uses the same key as both prefix and suffix,
-    ; it will never execute.  Even if it did, it would have no effect and
-    ; is unlikely to conflict with an existing hotkey for obvious reasons.
-    Hotkey '~XButton2 & ~XButton2', _ => 0
-    ; Note: To undo this later, it's necessary to know which HotIf context
-    ; was active, and currently that's impossible unless you set it yourself.
-    ; To do this without affecting the caller's HotIf, create a new thread.
 }
 
 

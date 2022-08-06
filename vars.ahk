@@ -32,8 +32,8 @@ define_vars() {
 	EventInfo: rw,
 	FileEncoding: rw,
 	Hour: r,
-	HotkeyInterval: IsSetRef(&A_HotkeyInterval) ? rw : 2000, ; Can only be changed from the default on v2.0-a130+
-	HotkeyModifierTimeout: IsSetRef(&A_HotkeyModifierTimeout) ? rw : 50, ; Can only be changed from the default on v2.0-a130+
+	HotkeyInterval: rw,
+	HotkeyModifierTimeout: rw,
 	IconFile: r,
 	IconHidden: {get: GetIconHidden, set: SetIconHidden},
 	IconNumber: r,
@@ -74,9 +74,9 @@ define_vars() {
 	; LoopRegName: r,
 	; LoopRegTimeModified: r,
 	; LoopRegType: r,
-	MaxHotkeysPerInterval: IsSetRef(&A_MaxHotkeysPerInterval) ? rw : 70, ; Can only be changed from the default on v2.0-a130+
+	MaxHotkeysPerInterval: rw,
 	MDay: r,
-	MenuMaskKey: IsSetRef(&A_MenuMaskKey) ? rw : 'vk11sc01D', ; Can only be changed from the default on v2.0-a130+
+	MenuMaskKey: rw,
 	Min: r,
 	MM: r,
 	MMM: r,
