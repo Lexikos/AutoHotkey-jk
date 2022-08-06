@@ -2,9 +2,9 @@
 ; Functions with a non-word char prefix are disabled.
 functions := "
 (Join`s
-!Abs !ACos !ASin !ATan BlockInput !BufferAlloc CallbackCreate CallbackFree
+!Abs !ACos !ASin !ATan BlockInput !Buffer CallbackCreate CallbackFree
 CaretGetPos !Ceil !Chr Click ClipWait ComCall ComObjActive ComObjArray
-ComObjConnect ComObjCreate ComObject ComObjFlags ComObjGet ComObjQuery
+ComObjConnect ComObject ComValue ComObjFlags ComObjGet ComObjQuery
 ComObjType ComObjValue ControlAddItem ControlChooseIndex ControlChooseString
 ControlClick ControlDeleteItem ControlFindItem ControlFocus ControlGetChecked
 ControlGetChoice ControlGetClassNN ControlGetEnabled ControlGetExStyle
@@ -27,7 +27,7 @@ GroupClose GroupDeactivate GuiCtrlFromHwnd GuiFromHwnd !HasBase !HasMethod !HasP
 HotIf HotIfWinActive HotIfWinExist HotIfWinNotActive HotIfWinNotExist Hotkey
 Hotstring IL_Add IL_Create IL_Destroy ImageSearch IniDelete IniRead IniWrite
 InputBox !InStr !IsAlnum !IsAlpha !IsDigit !IsFloat !IsInteger !IsLabel !IsLower
-!IsNumber !IsObject !IsSet !IsSpace !IsTime !IsUpper !IsXDigit KeyHistory KeyWait
+!IsNumber !IsObject !IsSet !IsSetRef !IsSpace !IsTime !IsUpper !IsXDigit KeyHistory KeyWait
 ListHotkeys !ListLines !ListVars ListViewGetContent !Ln LoadPicture !Log !LTrim !Max
 MenuFromHandle MenuSelect !Min !Mod MonitorGet MonitorGetCount MonitorGetName
 MonitorGetPrimary MonitorGetWorkArea MouseClick MouseClickDrag MouseGetPos
@@ -36,7 +36,7 @@ MouseMove MsgBox NumGet NumPut !ObjAddRef !ObjBindMethod !ObjFromPtr
 !ObjOwnProps !ObjPtr !ObjPtrAddRef !ObjRelease !ObjSetBase !ObjSetCapacity
 OnClipboardChange OnError OnExit OnMessage !Ord OutputDebug Pause PixelGetColor
 PixelSearch PostMessage ProcessClose ProcessExist ProcessSetPriority ProcessWait
-ProcessWaitClose Random RandomSeed RegDelete RegDeleteKey !RegExMatch
+ProcessWaitClose Random RegDelete RegDeleteKey !RegExMatch
 !RegExReplace RegRead RegWrite Reload !Round !RTrim Run RunAs RunWait Send
 SendEvent SendInput SendLevel SendMessage SendMode SendPlay SendText
 SetCapslockState SetControlDelay SetDefaultMouseSpeed SetKeyDelay SetMouseDelay
