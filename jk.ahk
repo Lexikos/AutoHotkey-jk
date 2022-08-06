@@ -60,7 +60,7 @@ ParseCommandLine() {
                 break 2
             }
         }
-        if !IsSetRef(&jkfile) {
+        if !IsSet(jkfile) {
             jkfile := FileSelect("1", default_script_name, "Select Script File", "Script Files (*.jk;*.js)")
             if jkfile = ""
                 ExitApp
@@ -70,7 +70,7 @@ ParseCommandLine() {
         Loop Files J_Args.RemoveAt(1)
             jkfile := A_LoopFileFullPath
     }
-    if !IsSetRef(&jkfile) {
+    if !IsSet(jkfile) {
         MsgBox "Script file not found.",, "IconX"
         ExitApp
     }
@@ -102,7 +102,7 @@ MAX_SAFE_INTEGER := js.Number.MAX_SAFE_INTEGER
 AddAhkObjects js
 
 ; Debug
-IsSetRef(&D) ? js.D := WrapBif(D) : %'D'% := _ => ""
+IsSet(D) ? js.D := WrapBif(D) : %'D'% := _ => ""
 
 loading_script := true    ; ExitApp if a SyntaxError is encountered while loading.
 StartupIconTimer true
@@ -242,7 +242,7 @@ CallIntoJS(callee, args) {
 ArrayToArgv(args) {
     b := Buffer(args.Length * A_PtrSize, 0)
     for arg in args {
-        if IsSetRef(&arg)
+        if IsSet(arg)
             NumPut 'ptr', ToJs(arg), b, (A_Index-1)*A_PtrSize
         else
             NumPut 'ptr', JsRT.JsGetUndefinedValue(), b, (A_Index-1)*A_PtrSize
@@ -428,12 +428,12 @@ ExternalProperty(rv, name, ptr:=unset) {
     id := JsRT.JsGetPropertyIdFromName(name)
     rx := JsRT.JsGetProperty(rv, id)
     if JsRT.JsGetValueType(rx) = 0 { ; JsUndefined
-        if !IsSetRef(&ptr) || !ptr
+        if !IsSet(ptr) || !ptr
             return 0
         rx := JsRT.JsCreateExternalObject(ptr, 0)
         JsRT.JsSetProperty(rv, id, rx, true)
     }
-    else if IsSetRef(&ptr)
+    else if IsSet(ptr)
         JsRT.JsSetExternalData(rx, ptr)
     else
         ptr := JsRT.JsGetExternalData(rx)
@@ -704,7 +704,7 @@ Include(path) {
 StartupIconTimer(enable := unset) {
     ; This timer is used to prevent the icon from appearing momentarily
     ; for scripts which use A_IconHidden within 100ms of starting.
-    if !IsSetRef(&enable) {
+    if !IsSet(enable) {
         if !IconTimerIsSet ; Timer already fired or script has set A_IconHidden.
             return
         A_IconHidden := false
@@ -721,7 +721,7 @@ SetIconHidden(value) {
 
 
 _LoopFiles(pattern, mode, body:=unset) {
-    IsSetRef(&body) || (body := mode, mode := 'F')
+    IsSet(body) || (body := mode, mode := 'F')
     static fields := ['attrib', 'dir', 'ext', 'fullPath', 'name', 'path', 'shortName'
         , 'shortPath', 'size', 'timeAccessed', 'timeCreated', 'timeModified']
     Loop Files pattern, mode {
@@ -734,7 +734,7 @@ _LoopFiles(pattern, mode, body:=unset) {
 
 
 _LoopReg(keyname, mode, body:=unset) {
-    IsSetRef(&body) || (body := mode, mode := 'F')
+    IsSet(body) || (body := mode, mode := 'F')
     static fields := ['name', 'type', 'key', 'timeModified']
     Loop Reg keyname, mode {
         item := js.Object()
