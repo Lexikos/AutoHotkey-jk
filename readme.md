@@ -83,11 +83,13 @@ Because JavaScript has no language feature equivalent to ByRef, the following fu
 
 dllCall and comCall are available and mostly unchanged, but may be unsafe with regard to pointers on x64, as JavaScript does not support the full 64-bit integer range. Parameters with the `*` or `P` type suffix currently cannot produce output since the script has no way to create a VarRef, but ptr parameters can be used instead (e.g. with a single-element typed array such as `new Uint32Array(1)`).
 
+Whenever new built-in functions are added to the base version of AutoHotkey, they must be also added to the list in [funcs.ahk](funcs.ahk) before they can be referenced in JavaScript.
+
 ### Variables
 
 All built-in variables should be available except for the following: `A_IsCritical`, `A_Index`, `A_Loop`..., `A_Space`, `A_Tab`, `A_ThisFunc`
 
-Any built-in variables added to base AutoHotkey will not be available unless they are also added to the list in [vars.ahk](vars.ahk).
+Whenever new built-in variables are added to the base version of AutoHotkey, they must be also added to the list in [vars.ahk](vars.ahk) before they can be referenced in JavaScript.
 
 ### Classes
 
