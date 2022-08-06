@@ -90,7 +90,7 @@ dllCall and comCall are available and mostly unchanged, but may be unsafe with r
 
 All built-in variables should be available except for the following: `A_IsCritical`, `A_Index`, `A_Loop`..., `A_Space`, `A_Tab`, `A_ThisFunc`
 
-`A_HotkeyInterval`, `A_MaxHotkeysPerInterval` and `A_HotkeyModifierTimeout` are fully supported with v2.0-a130. For prior versions, they are given the usual default values (2000, 70, 50), but cannot be set.
+Any built-in variables added to base AutoHotkey will not be available unless they are also added to the list in [vars.ahk](vars.ahk).
 
 ### Classes
 
@@ -124,13 +124,6 @@ include(path);
 Evaluates the file in global scope, at run time. There is no `*i` option, but try-catch can be used, and it can be called conditionally, like any other function. As with #Include, it has no effect if called a second time for the same path (which is resolved to a full path and case corrected internally).
 
 ```
-installKeybdHook();
-installMouseHook();
-persistent(persist);
-```
-Direct replacements for the corresponding directives prior to v2.0-a130 (which replaces the directives with functions). The `persist` parameter is supported prior to v2.0-a130, while `installKeybdHook` and `installMouseHook` support parameters only with v2.0-a130.
-
-```
 singleInstance(mode);
 ```
 Scripts are not single-instance by default, as the script needs to run in order to override default behaviour. `singleInstance(mode)` accepts the case-insensitive mode strings 'force' (the default if omitted), 'ignore' and 'prompt'.
@@ -142,7 +135,7 @@ hotkey.maxThreadsPerHotkey
 hotkey.useHook
 hotkey.suspendExempt
 ```
-These properties directly replace the corresponding directives; of course, being properties and not directives, their values can be retrieved or changed at runtime. As before, these settings only affect the default options for newly created hotkey variants.  `suspendExempt` requires AutoHotkey v2.0-a130, and has no effect on earlier versions.
+These properties directly replace the corresponding directives; of course, being properties and not directives, their values can be retrieved or changed at runtime. As before, these settings only affect the default options for newly created hotkey variants.
 
 ```
 A_IconHidden = false;
