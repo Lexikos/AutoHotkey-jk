@@ -3,7 +3,7 @@
 Aims to be a complete replacement for AutoHotkey.exe (when compiled), utilizing JavaScript instead of AutoHotkey's own language.
 
 Requirements:
-  - AutoHotkey v2.0-a128..v2.0-a130
+  - AutoHotkey v2.0-beta.6+
   - Windows 10
 
 ## Compiling
