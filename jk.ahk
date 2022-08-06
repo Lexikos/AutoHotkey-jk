@@ -1,4 +1,4 @@
-﻿JKVersion := '3.0-alpha.1'
+﻿JKVersion := '3.0-beta.7'
 ;@Ahk2Exe-Obey U_bits, = A_PtrSize*8
 ;@Ahk2Exe-SetName AutoHotkey %U_bits%-bit (jk)
 ;@Ahk2Exe-SetVersion %A_PriorLine~.*'(.*)'~$1%
@@ -7,7 +7,7 @@
 ;@Ahk2Exe-Bin %A_ScriptDir%\bin32\AutoHotkeySC.bin, AutoHotkey32.exe
 ;@Ahk2Exe-Bin %A_ScriptDir%\bin64\AutoHotkeySC.bin, AutoHotkey64.exe
 
-#Requires AutoHotkey v2.0-a128+
+#Requires AutoHotkey v2.0-beta.6
 
 ; Configuration
 functions_use_lowercase_initial_letter := true
@@ -126,7 +126,8 @@ AddAhkObjects(scope) {
         if A_LoopField ~= '\W'  ; Disabled function
             continue
         fn_name := A_LoopField
-        fn := %fn_name%
+        if !(fn := %fn_name% ?? 0)  ; Tolerate missing functions (for older versions)
+            continue
         ; Add the function
         fn_name := AdjustFuncName(fn_name)
         scope.%fn_name% := WrapBif(fn)

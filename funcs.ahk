@@ -1,4 +1,4 @@
-; This lists all v2 functions at the time of writing (v2.0-a129).
+; This lists all v2 functions at the time of writing (v2.0-beta.7).
 ; Functions with a non-word char prefix are disabled.
 functions := "
 (Join`s
@@ -36,7 +36,8 @@ MouseMove MsgBox NumGet NumPut !ObjAddRef !ObjBindMethod !ObjFromPtr
 !ObjOwnProps !ObjPtr !ObjPtrAddRef !ObjRelease !ObjSetBase !ObjSetCapacity
 OnClipboardChange OnError OnExit OnMessage !Ord OutputDebug Pause PixelGetColor
 PixelSearch PostMessage ProcessClose ProcessExist ProcessSetPriority ProcessWait
-ProcessWaitClose Random RegDelete RegDeleteKey !RegExMatch
+ProcessGetName ProcessGetPath ProcessWaitClose
+Random RegCreateKey RegDelete RegDeleteKey !RegExMatch
 !RegExReplace RegRead RegWrite Reload !Round !RTrim Run RunAs RunWait Send
 SendEvent SendInput SendLevel SendMessage SendMode SendPlay SendText
 SetCapslockState SetControlDelay SetDefaultMouseSpeed SetKeyDelay SetMouseDelay
