@@ -4,7 +4,7 @@ Aims to be a complete replacement for AutoHotkey.exe (when compiled), utilizing 
 
 Requirements:
   - AutoHotkey v2.0-beta.6+
-  - Windows 10
+  - Windows 10+
 
 ## Compiling
 
