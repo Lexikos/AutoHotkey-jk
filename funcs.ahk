@@ -101,7 +101,7 @@ WinWaitActive.returns := Boolean
 WinWaitClose.returns := Boolean
 WinWaitNotActive.returns := Boolean
 
-ArrayToJs(a) => js.Array(a*)
+ArrayToJs(a) => (ja := js.Array(), ja.push(a*), ja)
 WinGetControls.returns := ArrayToJs
 WinGetControlsHwnd.returns := ArrayToJs
 WinGetList.returns := ArrayToJs
