@@ -150,11 +150,13 @@ Invokes a full garbage collection cycle. This is generally not necessary.
 
 ## Known Issues
 
-jk uses the Edge JavaScript Runtime, which implies a few limitations:
+jk uses the *legacy* Edge JavaScript Runtime, which implies a few limitations:
   - It requires Windows 10.
   - Attempting to load the older engine used by IE11 (such as with a WebBrowser ActiveX control) may fail and cause the program to become unstable. Microsoft states that an app can support only one version of JsRT per process.
   - ES6 modules are not supported.
+  - ES7 and newer language features are not supported.
 
-These limitations might be lifted by implementing [ChakraCore](https://github.com/chakra-core/ChakraCore), which is self-contained and separate from the engines included with the system. However:
+Some of these limitations might be lifted by implementing [ChakraCore](https://github.com/chakra-core/ChakraCore), which is self-contained and separate from the engines included with the system. However:
   - ChakraCore.dll is currently around 7MB.
   - As ChakraCore is cross-platform, it does not natively support IDispatch or conversion of values to/from COM Variant, which jk currently relies on.
+  - At the time of writing, ChakraCore is still significantly behind other engines.
