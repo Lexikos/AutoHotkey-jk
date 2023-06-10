@@ -97,6 +97,8 @@ These classes are available: `ClipboardAll`, `File`, `Gui`, `InputHook`, `Menu`,
 
 Instead of a `Buffer`, use a JavaScript `ArrayBuffer`, typed array or `DataView`.
 
+To access controls of a Gui, use `myGui.control(...)`, not `myGui[...]`. JavaScript's `[]` operator does not work the same way as AutoHotkey's.
+
 ### Loops
 
 Loop Parse has no replacement; JavaScript has enough ways to parse strings. Loop Files and Loop Reg are replaced with functions which accept a callback. Ideally they would be replaced with functions which return an iterator (to use with `for (x of y)`), but the nature of their implementation makes that difficult.
