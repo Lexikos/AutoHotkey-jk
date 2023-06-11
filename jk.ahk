@@ -1,4 +1,4 @@
-﻿JKVersion := '3.0-beta.7'
+﻿JKVersion := '3.0.2'
 ;@Ahk2Exe-Obey U_bits, = A_PtrSize*8
 ;@Ahk2Exe-SetName AutoHotkey %U_bits%-bit (jk)
 ;@Ahk2Exe-SetVersion %A_PriorLine~.*'(.*)'~$1%
